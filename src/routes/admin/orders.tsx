@@ -226,21 +226,21 @@ function AdminOrdersPage() {
                       {/* Delivery Status & Partner */}
                       <td className="py-3.5 px-4">
                         <div className="font-medium text-stone-200 capitalize">
-                          {ord.delivery_partner} (₹{parseFloat(ord.delivery_charge || 0).toLocaleString("en-IN")})
+                          {ord.delivery?.delivery_partner || ord.delivery_partner || "Porter"} (₹{parseFloat(ord.delivery?.delivery_charge || ord.delivery_charge || 0).toLocaleString("en-IN")})
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-[10px] text-stone-400 capitalize">
-                            Status: {ord.delivery_status}
+                            Status: {ord.delivery?.delivery_status || ord.delivery_status || "pending"}
                           </span>
                           <span className="text-stone-600">·</span>
                           <span
                             className={`text-[10px] font-semibold ${
-                              ord.delivery_payment_status === "paid"
+                              (ord.delivery?.delivery_payment_status || ord.delivery_payment_status) === "paid"
                                 ? "text-emerald-400"
                                 : "text-amber-400"
                             }`}
                           >
-                            Charge {ord.delivery_payment_status}
+                            Charge {ord.delivery?.delivery_payment_status || ord.delivery_payment_status || "pending"}
                           </span>
                         </div>
                       </td>

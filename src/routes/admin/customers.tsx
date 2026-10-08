@@ -57,8 +57,9 @@ function AdminCustomersPage() {
     setSelectedCustomer(cust);
     try {
       const res: any = await api.admin.getCustomer(cust.id);
-      if (res.data) {
-        setSelectedCustomer(res.data);
+      const detail = res.customer || res.data;
+      if (detail) {
+        setSelectedCustomer(detail);
       }
     } catch (err: any) {
       toast.error("Failed to fetch customer profile", { description: err.message });

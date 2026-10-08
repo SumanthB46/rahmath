@@ -8,15 +8,20 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
-  Download,
   Sparkles,
   MapPin,
   X,
   ChevronDown,
-  Layers,
-  FileText,
 } from "lucide-react";
-import api from "@/lib/api";
+import api, { API_BASE_URL } from "@/lib/api";
+
+const resolveMediaUrl = (url?: string) => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) return url;
+  const backendOrigin = API_BASE_URL.replace(/\/api\/?$/, "");
+  if (url.startsWith("/uploads")) return `${backendOrigin}${url}`;
+  return url;
+};
 
 // High-resolution architectural photography assets
 import floorImg from "@/assets/solutions/flooring.png";
@@ -57,149 +62,6 @@ export const Route = createFileRoute("/catalog")({
   component: MaterialLibraryPage,
 });
 
-// Curated library editions organized by material chapters
-const LIBRARY_EDITIONS: CatalogueItem[] = [
-  // ── CHAPTER 1: TILES ──
-  {
-    id: "edition-01",
-    title: "Floor Collection",
-    category: "Floor Tiles",
-    subtitle: "Living & High-Traffic Vitrified Porcelain",
-    edition: "EDITION 01 · 2026",
-    pages: 32,
-    format: "80 × 160 / 60 × 120 cm",
-    finish: "Satin Matte & Carved Honed",
-    coverImage: floorImg,
-    chapter: "TILES",
-    pdfUrl: "/assets/npd-compressed.mp4",
-  },
-  {
-    id: "edition-02",
-    title: "Wall Cladding",
-    category: "Wall Tiles",
-    subtitle: "Curated Architectural Vertical Surfaces",
-    edition: "EDITION 02 · 2026",
-    pages: 28,
-    format: "60 × 120 / 30 × 60 cm",
-    finish: "Fluted Ceramic & High-Gloss",
-    coverImage: wallImg,
-    chapter: "TILES",
-    pdfUrl: "/assets/npd-compressed.mp4",
-  },
-  {
-    id: "edition-03",
-    title: "Porcelain Systems",
-    category: "Porcelain Tiles",
-    subtitle: "Diamond-Rectified European Grade Surfaces",
-    edition: "EDITION 03 · 2026",
-    pages: 36,
-    format: "120 × 120 / 60 × 120 cm",
-    finish: "Micro-Textured Anti-Slip",
-    coverImage: porcelainImg,
-    chapter: "TILES",
-    pdfUrl: "/assets/npd-compressed.mp4",
-  },
-
-  // ── CHAPTER 2: SURFACES ──
-  {
-    id: "edition-04",
-    title: "Large Format Slabs",
-    category: "Slabs & Formats",
-    subtitle: "120 × 240 cm Monolithic Continuous Porcelain",
-    edition: "EDITION 04 · 2026",
-    pages: 44,
-    format: "120 × 240 / 120 × 280 cm",
-    finish: "Silk Touch Velvet & Polish",
-    coverImage: slabImg,
-    chapter: "SURFACES",
-    featured: true,
-    pdfUrl: "/assets/npd-compressed.mp4",
-  },
-  {
-    id: "edition-05",
-    title: "Grand Sintered Slabs",
-    category: "Sintered Stone",
-    subtitle: "Continuous Bookmatched Veining & Zero Porosity",
-    edition: "EDITION 05 · 2026",
-    pages: 48,
-    format: "120 × 240 cm (15mm & 9mm)",
-    finish: "High-Gloss Mirror & Satin",
-    coverImage: porcelainImg,
-    chapter: "SURFACES",
-    pdfUrl: "/assets/npd-compressed.mp4",
-  },
-  {
-    id: "edition-06",
-    title: "Marble & Granite",
-    category: "Natural Stone",
-    subtitle: "Imported Italian Marble & Dense Granite Blocks",
-    edition: "EDITION 06 · 2026",
-    pages: 40,
-    format: "Bespoke Cut-to-Size",
-    finish: "Leathered & Honed Italian Finish",
-    coverImage: countertopsImg,
-    chapter: "SURFACES",
-    pdfUrl: "/assets/npd-compressed.mp4",
-  },
-
-  // ── CHAPTER 3: SANITARYWARE ──
-  {
-    id: "edition-07",
-    title: "Bespoke Basins",
-    category: "Sanitaryware",
-    subtitle: "Monolithic Sintered Stone Integrated Sinks",
-    edition: "EDITION 07 · 2026",
-    pages: 24,
-    format: "Integrated Sloped Drain Systems",
-    finish: "Mitered 45° Edge Joints",
-    coverImage: sinkImg,
-    chapter: "SANITARYWARE",
-    pdfUrl: "/assets/npd-compressed.mp4",
-  },
-  {
-    id: "edition-08",
-    title: "Ceramic Troughs",
-    category: "Sanitaryware",
-    subtitle: "Precision Engineered Dual & Commercial Basins",
-    edition: "EDITION 08 · 2026",
-    pages: 20,
-    format: "Commercial & Villa Scale",
-    finish: "Antibacterial Glaze Finish",
-    coverImage: sinkImg,
-    chapter: "SANITARYWARE",
-    pdfUrl: "/assets/npd-compressed.mp4",
-  },
-  {
-    id: "edition-09",
-    title: "Stone Vanities",
-    category: "Sanitaryware",
-    subtitle: "Single-Block Italian Carrara & Marquina Cuts",
-    edition: "EDITION 09 · 2026",
-    pages: 26,
-    format: "Custom Floating Configurations",
-    finish: "Honed Natural Velvet",
-    coverImage: countertopsImg,
-    chapter: "SANITARYWARE",
-    pdfUrl: "/assets/npd-compressed.mp4",
-  },
-];
-
-// Featured Edition Centerpiece
-const FEATURED_EDITION: CatalogueItem = {
-  id: "featured-master",
-  title: "Grand Format Sintered Slabs",
-  category: "Architectural Slabs",
-  subtitle: "A study in scale, veining and continuous surfaces.",
-  edition: "SPECIAL EDITION · 2026",
-  pages: 52,
-  format: "120 × 240 cm Monolithic",
-  finish: "Continuous Bookmatch & Velvet Polish",
-  coverImage: slabImg,
-  chapter: "SURFACES",
-  featured: true,
-  pdfUrl: "/assets/npd-compressed.mp4",
-};
-
 interface LibrarySection {
   id: number;
   name: string;
@@ -211,15 +73,18 @@ interface LibrarySection {
 function MaterialLibraryPage() {
   useLenis();
   const [sections, setSections] = useState<LibrarySection[]>([]);
-  const [featuredEdition, setFeaturedEdition] = useState<CatalogueItem>(FEATURED_EDITION);
+  const [featuredEdition, setFeaturedEdition] = useState<CatalogueItem | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeFlipbookItem, setActiveFlipbookItem] = useState<CatalogueItem | null>(null);
 
-  // Load live material library structure from backend CMS
-  useEffect(() => {
+  const loadLibrary = () => {
     let active = true;
+    setLoading(true);
+    setError(null);
     api.catalogs.getLibrary()
-      .then((res) => {
-        if (!active || !res.success || !res.data) return;
+      .then((res: any) => {
+        if (!active || !res?.success || !res?.data) return;
         const rawSections = res.data.sections || [];
         if (rawSections.length > 0) {
           const mapped: LibrarySection[] = rawSections.map((sec: any) => ({
@@ -233,16 +98,18 @@ function MaterialLibraryPage() {
               category: c.category || c.title,
               subtitle: c.subtitle || "Architectural compendium",
               edition: c.edition || "EDITION 01 · 2026",
-              pages: c.pages || 32,
+              pages: Number(c.pages) || 22,
               format: c.format || "120 × 240 cm",
               finish: c.finish || "Satin Matte & Carved Honed",
-              coverImage: c.cover_image || slabImg,
-              pdfUrl: c.pdf_url,
+              coverImage: resolveMediaUrl(c.cover_image) || slabImg,
+              pdfUrl: resolveMediaUrl(c.pdf_url),
               chapter: sec.name as any,
               featured: c.is_featured,
             })),
           }));
           setSections(mapped);
+        } else {
+          setSections([]);
         }
 
         if (res.data.featured) {
@@ -253,23 +120,33 @@ function MaterialLibraryPage() {
             category: f.category || "Architectural Slabs",
             subtitle: f.subtitle || "A study in scale, veining and continuous surfaces.",
             edition: f.edition || "SPECIAL EDITION · 2026",
-            pages: f.pages || 52,
+            pages: Number(f.pages) || 22,
             format: f.format || "120 × 240 cm Monolithic",
             finish: f.finish || "Continuous Bookmatch & Velvet Polish",
-            coverImage: f.cover_image || slabImg,
-            pdfUrl: f.pdf_url,
+            coverImage: resolveMediaUrl(f.cover_image) || slabImg,
+            pdfUrl: resolveMediaUrl(f.pdf_url),
             chapter: "SURFACES",
             featured: true,
           });
         }
       })
-      .catch(() => {
-        // Fallback gracefully to static initial library
+      .catch((err: any) => {
+        if (!active) return;
+        console.error("Failed to load catalog library:", err);
+        setError(err?.message || "Failed to load material library.");
+        setSections([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
 
     return () => {
       active = false;
     };
+  };
+
+  useEffect(() => {
+    return loadLibrary();
   }, []);
 
   // Deep linking: Open flipbook if URL has ?book= or ?open=
@@ -279,19 +156,13 @@ function MaterialLibraryPage() {
     const bookQuery = params.get("book") || params.get("open") || params.get("id");
     if (!bookQuery) return;
 
-    // Search in dynamic sections first
+    // Search in dynamic sections
     for (const sec of sections) {
       const match = sec.catalogues.find((c) => c.id === bookQuery || c.title.toLowerCase().replace(/[^a-z0-9]/g, "-") === bookQuery);
       if (match) {
         setActiveFlipbookItem(match);
         return;
       }
-    }
-
-    // Search in fallback
-    const fallbackMatch = LIBRARY_EDITIONS.find((c) => c.id === bookQuery || c.title.toLowerCase().replace(/[^a-z0-9]/g, "-") === bookQuery);
-    if (fallbackMatch) {
-      setActiveFlipbookItem(fallbackMatch);
     }
   }, [sections]);
 
@@ -308,6 +179,7 @@ function MaterialLibraryPage() {
 
   const openReader = (item: CatalogueItem) => {
     setActiveFlipbookItem(item);
+    setReaderMode("flipbook");
     if (typeof window !== "undefined") {
       const slug = item.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
       const url = new URL(window.location.href);
@@ -433,6 +305,7 @@ function MaterialLibraryPage() {
 
   // Render the Visual Climax (Featured Edition Centerpiece)
   const renderFeaturedEditionBlock = () => {
+    if (!featuredEdition) return null;
     return (
       <div className="relative rounded-3xl overflow-hidden border border-white/10 bg-stone-900 shadow-2xl p-8 sm:p-14 lg:p-16 text-left my-8">
         {/* Architectural Background Texture */}
@@ -557,69 +430,79 @@ function MaterialLibraryPage() {
             </div>
           </div>
 
-          {/* Right Column: One Large Physical-Looking Catalogue Book Standing Slightly Angled */}
+          {/* Right Column: Featured Book or First Published Catalogue */}
           <div className="lg:col-span-5 flex justify-center lg:justify-end">
-            <div className="relative">
-              {/* Floor Shadow beneath the standing book */}
-              <div
-                className="absolute -bottom-6 -left-4 -right-4 h-12 bg-stone-950/25 blur-xl rounded-full pointer-events-none"
-                style={{ transform: "rotate(-2deg)" }}
-              />
-
-              <div
-                onClick={() => openReader(featuredEdition)}
-                className="group relative w-full max-w-[320px] sm:max-w-[360px] aspect-[3/4] rounded-r-xl cursor-pointer select-none transition-all duration-500 ease-out transform-gpu group-hover:-translate-y-2"
-                style={{
-                  perspective: "1400px",
-                  transform: "rotateY(-10deg) rotateX(3deg)",
-                  boxShadow:
-                    "0 30px 60px -15px rgba(23,23,22,0.45), 6px 8px 0px -1px #22201e, 12px 14px 0px -2px #181615, 18px 20px 30px -4px rgba(23,23,22,0.35)",
-                }}
-              >
-                {/* Hardcover Spine */}
-                <div className="absolute left-0 inset-y-0 w-4 bg-gradient-to-r from-black/95 via-black/40 to-transparent z-30 pointer-events-none" />
-                <div className="absolute left-0 inset-y-0 w-[5px] bg-[#0c0c0b] z-30" />
-
-                {/* Cover Art */}
-                <img
-                  src={featuredEdition.coverImage || slabImg}
-                  alt={featuredEdition.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 brightness-95"
+            {featuredEdition ? (
+              <div className="relative">
+                {/* Floor Shadow beneath the standing book */}
+                <div
+                  className="absolute -bottom-6 -left-4 -right-4 h-12 bg-stone-950/25 blur-xl rounded-full pointer-events-none"
+                  style={{ transform: "rotate(-2deg)" }}
                 />
 
-                {/* Ambient Shadow & Gold Foil Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/20 pointer-events-none" />
+                <div
+                  onClick={() => openReader(featuredEdition)}
+                  className="group relative w-full max-w-[320px] sm:max-w-[360px] aspect-[3/4] rounded-r-xl cursor-pointer select-none transition-all duration-500 ease-out transform-gpu group-hover:-translate-y-2"
+                  style={{
+                    perspective: "1400px",
+                    transform: "rotateY(-10deg) rotateX(3deg)",
+                    boxShadow:
+                      "0 30px 60px -15px rgba(23,23,22,0.45), 6px 8px 0px -1px #22201e, 12px 14px 0px -2px #181615, 18px 20px 30px -4px rgba(23,23,22,0.35)",
+                  }}
+                >
+                  {/* Hardcover Spine */}
+                  <div className="absolute left-0 inset-y-0 w-4 bg-gradient-to-r from-black/95 via-black/40 to-transparent z-30 pointer-events-none" />
+                  <div className="absolute left-0 inset-y-0 w-[5px] bg-[#0c0c0b] z-30" />
 
-                <div className="absolute inset-0 p-8 flex flex-col justify-between text-white z-20 text-left">
-                  <div className="border-b border-white/20 pb-3 flex items-center justify-between">
-                    <span className="text-[11px] font-mono tracking-[0.3em] uppercase text-white font-bold">
-                      MUBARAK
-                    </span>
-                    <span className="text-[9px] font-mono tracking-widest text-[#C9A13A] uppercase bg-black/60 px-2.5 py-0.5 rounded border border-[#C9A13A]/40 font-semibold">
-                      2026
-                    </span>
-                  </div>
+                  {/* Cover Art */}
+                  <img
+                    src={featuredEdition.coverImage || slabImg}
+                    alt={featuredEdition.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 brightness-95"
+                  />
 
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-mono tracking-[0.25em] text-[#C9A13A] uppercase block font-semibold">
-                      {featuredEdition.category}
-                    </span>
-                    <h2 className="text-2xl sm:text-3xl font-serif font-normal text-white uppercase tracking-tight leading-tight">
-                      {featuredEdition.title}
-                    </h2>
-                    <p className="text-xs font-mono text-[#99958C] tracking-wide pt-1">
-                      {featuredEdition.subtitle}
-                    </p>
-                    <div className="pt-3">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-[0.2em] text-[#C9A13A] group-hover:text-amber-200 transition-colors font-semibold">
-                        <span>Open Flipbook</span>
-                        <ArrowRight className="h-3.5 w-3.5" />
+                  {/* Ambient Shadow & Gold Foil Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/20 pointer-events-none" />
+
+                  <div className="absolute inset-0 p-8 flex flex-col justify-between text-white z-20 text-left">
+                    <div className="border-b border-white/20 pb-3 flex items-center justify-between">
+                      <span className="text-[11px] font-mono tracking-[0.3em] uppercase text-white font-bold">
+                        MUBARAK
                       </span>
+                      <span className="text-[9px] font-mono tracking-widest text-[#C9A13A] uppercase bg-black/60 px-2.5 py-0.5 rounded border border-[#C9A13A]/40 font-semibold">
+                        2026
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-mono tracking-[0.25em] text-[#C9A13A] uppercase block font-semibold">
+                        {featuredEdition.category}
+                      </span>
+                      <h2 className="text-2xl sm:text-3xl font-serif font-normal text-white uppercase tracking-tight leading-tight">
+                        {featuredEdition.title}
+                      </h2>
+                      <p className="text-xs font-mono text-[#99958C] tracking-wide pt-1">
+                        {featuredEdition.subtitle}
+                      </p>
+                      <div className="pt-3">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-[0.2em] text-[#C9A13A] group-hover:text-amber-200 transition-colors font-semibold">
+                          <span>Open Flipbook</span>
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="w-full max-w-[280px] aspect-[3/4] rounded-r-xl border border-stone-800 bg-[#1F1D1B] p-8 flex flex-col justify-between text-stone-400">
+                <BookOpen className="h-8 w-8 text-[#C9A13A]" />
+                <div>
+                  <h3 className="font-serif text-lg text-stone-200">Architectural Library</h3>
+                  <p className="text-xs text-stone-500 mt-1">Explore all published catalogues below.</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -639,7 +522,30 @@ function MaterialLibraryPage() {
         </div>
 
         {/* DYNAMIC CHAPTER RENDERING */}
-        {sections.length > 0 ? (
+        {loading ? (
+          <div className="space-y-12 py-8">
+            {[1, 2].map((n) => (
+              <div key={n} className="space-y-6">
+                <div className="h-8 bg-stone-800/80 rounded w-1/3 animate-pulse" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  {[1, 2, 3].map((b) => (
+                    <div key={b} className="aspect-[3/4] bg-stone-800/50 rounded-xl animate-pulse" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="bg-[#1C1A18] border border-white/10 p-10 text-center max-w-md mx-auto my-12 rounded-2xl space-y-3">
+            <p className="text-xs text-stone-400">{error}</p>
+            <button
+              onClick={loadLibrary}
+              className="px-5 py-2 rounded-full bg-[#C9A13A] text-stone-950 text-xs font-bold uppercase tracking-wider cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        ) : sections.length > 0 ? (
           sections.map((sec, secIdx) => {
             const isSecondSection = secIdx === 1 || sec.name === "SURFACES";
             return (
@@ -672,80 +578,13 @@ function MaterialLibraryPage() {
             );
           })
         ) : (
-          /* Static Fallback while loading */
-          <>
-            {/* ── CHAPTER 1: TILES ── */}
-            <div className="space-y-8 text-left">
-              <div className="border-b border-white/[0.08] pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
-                <div>
-                  <span className="text-xs font-mono tracking-[0.3em] text-[#C9A13A] uppercase font-bold block mb-1">
-                    CHAPTER 01
-                  </span>
-                  <h3 className="text-2xl sm:text-3xl font-serif font-normal text-[#F1EEE7] tracking-wide">
-                    TILES
-                  </h3>
-                </div>
-                <p className="text-xs font-mono text-[#99958C] uppercase tracking-wider">
-                  Floor Systems · Wall Cladding · Vitrified Porcelain
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-10">
-                {LIBRARY_EDITIONS.filter((item) => item.chapter === "TILES").map((book, idx) =>
-                  renderPhysicalBook(book, idx)
-                )}
-              </div>
-            </div>
-
-            {/* ── CHAPTER 2: SURFACES ── */}
-            <div className="space-y-8 text-left">
-              <div className="border-b border-white/[0.08] pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
-                <div>
-                  <span className="text-xs font-mono tracking-[0.3em] text-[#C9A13A] uppercase font-bold block mb-1">
-                    CHAPTER 02
-                  </span>
-                  <h3 className="text-2xl sm:text-3xl font-serif font-normal text-[#F1EEE7] tracking-wide">
-                    SURFACES
-                  </h3>
-                </div>
-                <p className="text-xs font-mono text-[#99958C] uppercase tracking-wider">
-                  Large Format · Grand Slabs · Natural Italian Stone
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-10">
-                {LIBRARY_EDITIONS.filter((item) => item.chapter === "SURFACES").map((book, idx) =>
-                  renderPhysicalBook(book, idx)
-                )}
-              </div>
-            </div>
-
-            {/* ── 3. VISUAL CLIMAX: FEATURED EDITION ── */}
-            {renderFeaturedEditionBlock()}
-
-            {/* ── CHAPTER 3: SANITARYWARE ── */}
-            <div className="space-y-8 text-left">
-              <div className="border-b border-white/[0.08] pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
-                <div>
-                  <span className="text-xs font-mono tracking-[0.3em] text-[#C9A13A] uppercase font-bold block mb-1">
-                    CHAPTER 03
-                  </span>
-                  <h3 className="text-2xl sm:text-3xl font-serif font-normal text-[#F1EEE7] tracking-wide">
-                    SANITARYWARE
-                  </h3>
-                </div>
-                <p className="text-xs font-mono text-[#99958C] uppercase tracking-wider">
-                  Bespoke Basins · Precision Troughs · Stone Vanities
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-10">
-                {LIBRARY_EDITIONS.filter((item) => item.chapter === "SANITARYWARE").map((book, idx) =>
-                  renderPhysicalBook(book, idx)
-                )}
-              </div>
-            </div>
-          </>
+          <div className="bg-[#1C1A18] border border-white/10 p-12 text-center max-w-md mx-auto my-12 rounded-2xl space-y-3">
+            <BookOpen className="h-10 w-10 text-[#C9A13A] mx-auto opacity-70" />
+            <h3 className="font-serif text-lg text-[#F1EEE7]">No Catalogues Published Yet</h3>
+            <p className="text-xs text-stone-400">
+              Architectural brochures and catalogues uploaded in Admin will appear here automatically.
+            </p>
+          </div>
         )}
 
         {/* ── 4. SHOWROOM CONNECTION & CONCLUSION ── */}
@@ -764,7 +603,8 @@ function MaterialLibraryPage() {
 
           <div className="pt-2">
             <Link
-              to="/#showroom"
+              to="/"
+              hash="showroom"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-[var(--gradient-gold)] text-stone-950 font-bold text-xs tracking-[0.2em] uppercase hover:opacity-95 transition-opacity shadow-xl"
             >
               <span>Visit the Flagship Showroom</span>
@@ -783,7 +623,7 @@ function MaterialLibraryPage() {
         </div>
       </div>
 
-      {/* ── 5. IMMERSIVE DEDICATED FLIPBOOK READER MODAL ── */}
+      {/* ── 5. IMMERSIVE DEDICATED FLIPBOOK / PDF READER MODAL ── */}
       {activeFlipbookItem && (
         <div className="fixed inset-0 z-50 bg-[#10100f] text-[#F1EEE7] flex flex-col justify-between overflow-hidden animate-in fade-in duration-300">
           {/* Top Reader Navigation Bar */}
@@ -794,50 +634,48 @@ function MaterialLibraryPage() {
               className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-[0.18em] text-[#C9A13A] hover:text-amber-200 transition-colors cursor-pointer"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span>Back to Library</span>
+              <span className="hidden sm:inline">Back to Library</span>
             </button>
 
-            {/* Book Title & Edition Stamp in Center */}
-            <div className="text-center hidden sm:block">
-              <h2 className="text-sm font-serif font-medium text-white tracking-wide uppercase">
-                {activeFlipbookItem.title}
-              </h2>
-              <span className="text-[9.5px] font-mono text-[#99958C] tracking-widest uppercase">
-                {activeFlipbookItem.edition} · 2026 ARCHITECTURAL COMPENDIUM
+            {/* Book Title & Chapter Identification */}
+            <div className="flex flex-col items-center">
+              <div className="flex items-center gap-2">
+                <h2 className="text-xs sm:text-sm font-serif font-medium text-white tracking-wide uppercase truncate max-w-[200px] sm:max-w-md">
+                  {activeFlipbookItem.title}
+                </h2>
+                <span className="text-[10px] font-mono text-[#C9A13A] px-2.5 py-0.5 rounded-full bg-[#C9A13A]/15 border border-[#C9A13A]/30 font-semibold uppercase">
+                  3D SKETCHBOOK
+                </span>
+              </div>
+              <span className="text-[9.5px] font-mono text-stone-400 uppercase tracking-widest mt-0.5">
+                {activeFlipbookItem.edition} · {activeFlipbookItem.format || "ARCHITECTURAL COMPENDIUM"}
               </span>
             </div>
 
             {/* Action Buttons on Right */}
             <div className="flex items-center gap-3">
-              <a
-                href={activeFlipbookItem.coverImage || "#"}
-                download={`${activeFlipbookItem.title}-Catalogue-2026.png`}
-                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/20 text-stone-300 hover:text-white text-xs font-mono tracking-wider uppercase transition-colors"
-              >
-                <Download className="h-3 w-3" />
-                <span>Download Spec</span>
-              </a>
-
               <button
                 onClick={closeReader}
-                className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                className="h-9 w-9 rounded-full bg-white/10 hover:bg-[#C9A13A] hover:text-stone-950 text-white flex items-center justify-center transition-all cursor-pointer"
                 aria-label="Close Reader"
+                title="Close Reader (ESC)"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
           </header>
 
-          {/* Flipbook Center Stage */}
-          <div className="flex-1 flex items-center justify-center p-4 sm:p-8 overflow-y-auto">
-            <div className="w-full max-w-4xl flex items-center justify-center">
-              <CatalogFlipBook item={activeFlipbookItem} />
-            </div>
+          {/* Reader Center Stage */}
+          <div className="flex-1 flex items-center justify-center p-2 sm:p-6 overflow-y-auto overflow-x-hidden">
+            <CatalogFlipBook item={activeFlipbookItem} />
           </div>
 
           {/* Reader Bottom Bar */}
           <footer className="h-12 px-6 border-t border-white/10 flex items-center justify-between text-[10.5px] font-mono text-[#99958C] uppercase tracking-widest shrink-0 bg-stone-950/80">
-            <span>Use click or drag on page edges to flip</span>
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#C9A13A] animate-pulse" />
+              <span>3D Curved Paper Engine · Drag page edges or use keyboard arrows</span>
+            </span>
             <span className="hidden sm:inline">Press ESC to exit</span>
           </footer>
         </div>

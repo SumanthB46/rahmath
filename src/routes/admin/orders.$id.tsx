@@ -80,20 +80,21 @@ function AdminOrderDetailsPage() {
     setLoading(true);
     try {
       const res: any = await api.admin.getOrder(id);
-      if (res.data) {
-        const ord = res.data;
+      const ord = res.order || res.data;
+      if (ord) {
         setOrder(ord);
+        const del = ord.delivery || {};
         setOrderStatus(ord.order_status || "pending");
-        setDeliveryPartner(ord.delivery_partner || "porter");
-        setDeliveryPartnerName(ord.delivery_partner_name || "");
-        setDeliveryCharge(String(ord.delivery_charge || 0));
-        setDeliveryPaymentMethod(ord.delivery_payment_method || "Customer Pays Delivery Partner");
-        setDeliveryStatus(ord.delivery_status || "pending");
-        setTrackingNumber(ord.tracking_number || "");
+        setDeliveryPartner(del.delivery_partner || ord.delivery_partner || "porter");
+        setDeliveryPartnerName(del.delivery_partner_name || ord.delivery_partner_name || "");
+        setDeliveryCharge(String(del.delivery_charge !== undefined ? del.delivery_charge : (ord.delivery_charge || 0)));
+        setDeliveryPaymentMethod(del.delivery_payment_method || ord.delivery_payment_method || "Customer Pays Delivery Partner");
+        setDeliveryStatus(del.delivery_status || ord.delivery_status || "pending");
+        setTrackingNumber(del.tracking_number || ord.tracking_number || "");
         setExpectedDeliveryDate(
-          ord.expected_delivery_date ? ord.expected_delivery_date.split("T")[0] : ""
+          (del.expected_delivery_date || ord.expected_delivery_date || "").split("T")[0]
         );
-        setDeliveryNotes(ord.delivery_notes || "");
+        setDeliveryNotes(del.delivery_notes || ord.delivery_notes || "");
       }
     } catch (err: any) {
       toast.error("Failed to load order", { description: err.message });
@@ -381,6 +382,17 @@ function AdminOrderDetailsPage() {
                   </div>
                 </div>
               </div>
+
+              {order.notes && (
+                <div className="border-t border-stone-800/80 pt-3 space-y-1">
+                  <span className="text-[10.5px] uppercase tracking-wider text-amber-500 font-semibold flex items-center gap-1.5">
+                    <FileText className="h-3 w-3" /> Customer Order Notes
+                  </span>
+                  <p className="text-stone-200 italic bg-stone-900/80 p-3 rounded-xl border border-stone-800 text-xs leading-relaxed">
+                    "{order.notes}"
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

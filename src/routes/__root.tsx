@@ -11,6 +11,9 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 import { Toaster } from "sonner";
+import { CartProvider } from "@/context/CartContext";
+import { CartDrawer } from "@/components/cart/CartDrawer";
+import { GlobalCheckoutModal } from "@/components/checkout/GlobalCheckoutModal";
 
 import appCss from "../styles.css?url";
 
@@ -148,11 +151,15 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ScrollToTop />
-      <ScrollRestoration />
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <Toaster theme="dark" position="bottom-right" richColors />
+      <CartProvider>
+        <ScrollToTop />
+        <ScrollRestoration />
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        <CartDrawer />
+        <GlobalCheckoutModal />
+        <Toaster theme="dark" position="bottom-right" richColors duration={3500} closeButton />
+      </CartProvider>
     </QueryClientProvider>
   );
 }

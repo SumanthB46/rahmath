@@ -98,9 +98,7 @@ function ContactPage() {
             <Link to="/" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#63574A] py-1">
               Home
             </Link>
-            <Link to="/collections" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#63574A] py-1">
-              Collections
-            </Link>
+
             <Link to="/sinks" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#63574A] py-1">
               Sinks &amp; Basins
             </Link>
@@ -353,18 +351,18 @@ function ContactPage() {
           <span>Home</span>
         </Link>
         <Link
-          to="/collections"
+          to="/products"
           className="flex flex-col items-center gap-1 text-[10.5px] font-normal text-[#554D45] hover:text-stone-950 transition-colors"
         >
-          <LayoutGrid className="h-[18px] w-[18px] stroke-[1.6]" />
-          <span>Collections</span>
+          <Layers className="h-[18px] w-[18px] stroke-[1.6]" />
+          <span>Products</span>
         </Link>
         <Link
           to="/sinks"
           className="flex flex-col items-center gap-1 text-[10.5px] font-normal text-[#554D45] hover:text-stone-950 transition-colors"
         >
-          <Layers className="h-[18px] w-[18px] stroke-[1.6]" />
-          <span>Products</span>
+          <LayoutGrid className="h-[18px] w-[18px] stroke-[1.6]" />
+          <span>Sinks</span>
         </Link>
         <Link
           to="/contact"

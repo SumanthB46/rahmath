@@ -163,7 +163,7 @@ export const api = {
     return httpRequest("/inquiries", { method: "POST", body: JSON.stringify(payload) });
   },
 
-  // Public Catalogs
+  // Public Catalogs & Library
   catalogs: {
     async getAll(params: { category?: string } = {}): Promise<{ success: boolean; data: any[]; categories: string[]; total: number }> {
       const q = params.category ? `?category=${encodeURIComponent(params.category)}` : "";
@@ -171,6 +171,22 @@ export const api = {
     },
     async getById(id: string | number): Promise<ApiResponse> {
       return httpRequest(`/catalogs/${id}`, { method: "GET" });
+    },
+    async getLibrary(): Promise<{ success: boolean; data: { sections: any[]; featured: any; total_catalogues: number } }> {
+      return httpRequest("/catalogs/library", { method: "GET" });
+    },
+    async getSections(): Promise<{ success: boolean; data: any[] }> {
+      return httpRequest("/catalogs/sections", { method: "GET" });
+    },
+    async getCatalogs(params?: { category?: string; section_id?: string | number }): Promise<{ success: boolean; data: any[]; categories: string[]; total: number }> {
+      const sp = new URLSearchParams();
+      if (params?.category) sp.set("category", params.category);
+      if (params?.section_id) sp.set("section_id", String(params.section_id));
+      const q = sp.toString() ? `?${sp.toString()}` : "";
+      return httpRequest(`/catalogs${q}`, { method: "GET" });
+    },
+    async getCatalog(idOrSlug: string | number): Promise<{ success: boolean; data: any }> {
+      return httpRequest(`/catalogs/${idOrSlug}`, { method: "GET" });
     },
     getDownloadUrl(id: string | number): string {
       return `${API_BASE_URL}/catalogs/${id}/download`;
@@ -181,6 +197,29 @@ export const api = {
   orders: {
     async track(orderQuery: string): Promise<ApiResponse> {
       return httpRequest(`/orders/track/${encodeURIComponent(orderQuery)}`, { method: "GET" });
+    },
+  },
+
+  // Public Products
+  products: {
+    async getAll(params: { category_id?: number | string; search?: string; limit?: number; offset?: number } = {}): Promise<{ success: boolean; products: any[] }> {
+      const sp = new URLSearchParams();
+      if (params.category_id) sp.set("category_id", String(params.category_id));
+      if (params.search) sp.set("search", params.search);
+      if (params.limit) sp.set("limit", String(params.limit));
+      if (params.offset) sp.set("offset", String(params.offset));
+      const q = sp.toString() ? `?${sp.toString()}` : "";
+      return httpRequest(`/products${q}`, { method: "GET" });
+    },
+    async getById(id: string | number): Promise<{ success: boolean; product: any }> {
+      return httpRequest(`/products/${id}`, { method: "GET" });
+    },
+  },
+
+  // Public Categories
+  categories: {
+    async getAll(): Promise<{ success: boolean; categories: any[] }> {
+      return httpRequest("/categories", { method: "GET" });
     },
   },
 
@@ -339,7 +378,7 @@ export const api = {
     },
 
     async updateOrderStatus(id: string | number, orderStatus: string): Promise<ApiResponse> {
-      return adminApiClient.patch(`/admin/orders/${id}/status`, { orderStatus });
+      return adminApiClient.patch(`/admin/orders/${id}/status`, { status: orderStatus, orderStatus });
     },
 
     // Delivery
@@ -442,6 +481,10 @@ export const api = {
       return adminApiClient.delete(`/admin/catalogs/${id}`);
     },
 
+    async reorderCatalogs(orderedIds: (string | number)[]): Promise<ApiResponse> {
+      return adminApiClient.post("/admin/catalogs/reorder", { orderedIds });
+    },
+
     async uploadCatalogFile(data: { filename: string; data: string; mimeType: string }): Promise<{ success: boolean; url: string; filename: string }> {
       return adminApiClient.post("/admin/catalogs/upload", data);
     },
@@ -529,33 +572,7 @@ export const api = {
       return adminApiClient.get("/admin/catalog-sections/structure");
     },
 
-    // Catalogs
-    async getCatalogs(params: Record<string, any> = {}): Promise<ApiResponse> {
-      const sp = new URLSearchParams();
-      Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && v !== "") sp.append(k, String(v));
-      });
-      const q = sp.toString() ? `?${sp.toString()}` : "";
-      return adminApiClient.get(`/admin/catalogs${q}`);
-    },
-    async getCatalog(id: string | number): Promise<ApiResponse> {
-      return adminApiClient.get(`/admin/catalogs/${id}`);
-    },
-    async createCatalog(data: any): Promise<ApiResponse> {
-      return adminApiClient.post("/admin/catalogs", data);
-    },
-    async updateCatalog(id: string | number, data: any): Promise<ApiResponse> {
-      return adminApiClient.put(`/admin/catalogs/${id}`, data);
-    },
-    async deleteCatalog(id: string | number): Promise<ApiResponse> {
-      return adminApiClient.delete(`/admin/catalogs/${id}`);
-    },
-    async reorderCatalogs(orderedIds: (string | number)[]): Promise<ApiResponse> {
-      return adminApiClient.post("/admin/catalogs/reorder", { orderedIds });
-    },
-    async uploadCatalogFile(payload: { filename: string; data: string; mimeType: string }): Promise<{ success: boolean; url: string }> {
-      return adminApiClient.post("/admin/catalogs/upload", payload);
-    },
+
 
     // Video Blog / Reels CMS
     async getReels(params?: { status?: string; search?: string; category?: string }): Promise<{ success: boolean; reels: ReelItem[]; counts: any }> {
@@ -582,30 +599,20 @@ export const api = {
     async uploadReelMedia(payload: { filename: string; data: string; mimeType: string }): Promise<{ success: boolean; url: string; filename: string }> {
       return adminApiClient.post("/admin/reels/upload", payload);
     },
+
+    // Inquiries / Leads (Admin)
+    async getInquiries(): Promise<{ success: boolean; inquiries: any[] }> {
+      return adminApiClient.get("/inquiries");
+    },
+    async updateInquiry(id: string | number, data: { status?: string; notes?: string }): Promise<ApiResponse> {
+      return adminApiClient.patch(`/inquiries/${id}`, data);
+    },
+    async deleteInquiry(id: string | number): Promise<ApiResponse> {
+      return adminApiClient.delete(`/inquiries/${id}`);
+    },
   },
 
-  // Public Catalogs & Library
-  catalogs: {
-    async getLibrary(): Promise<{ success: boolean; data: { sections: any[]; featured: any; total_catalogues: number } }> {
-      return httpRequest("/catalogs/library", { method: "GET" });
-    },
-    async getSections(): Promise<{ success: boolean; data: any[] }> {
-      return httpRequest("/catalogs/sections", { method: "GET" });
-    },
-    async getCatalogs(params?: { category?: string; section_id?: string | number }): Promise<{ success: boolean; data: any[]; categories: string[]; total: number }> {
-      const sp = new URLSearchParams();
-      if (params?.category) sp.set("category", params.category);
-      if (params?.section_id) sp.set("section_id", String(params.section_id));
-      const q = sp.toString() ? `?${sp.toString()}` : "";
-      return httpRequest(`/catalogs${q}`, { method: "GET" });
-    },
-    async getCatalog(idOrSlug: string | number): Promise<{ success: boolean; data: any }> {
-      return httpRequest(`/catalogs/${idOrSlug}`, { method: "GET" });
-    },
-    getDownloadUrl(id: string | number): string {
-      return `${API_BASE_URL}/catalogs/${id}/download`;
-    },
-  },
+
 
   // Public Sections
   sections: {
@@ -684,6 +691,8 @@ export const uploadReelMedia = async (file: File): Promise<{ success: boolean; u
 };
 
 // Exported standalone helpers
+export const getPublicProducts = (params?: any) => api.products.getAll(params);
+export const getPublicCategories = () => api.categories.getAll();
 export const getPublicSections = (page = "home") => api.sections.getPublicSections(page);
 export const getAdminSections = (page = "home") => api.admin.sections.getSections(page);
 export const updateSection = (id: string | number, data: any) => api.admin.sections.updateSection(id, data);

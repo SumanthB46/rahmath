@@ -14,9 +14,9 @@ export function CategoryGridEditor({ section, onSaveSuccess, onClose }: Category
   const [content, setContent] = useState<any>(() => ({
     title: initial.title || "CATEGORY",
     badge: initial.badge || "SHOP BY",
-    subtitle: initial.subtitle || "Discover our high-end collections crafted with the finest materials and attention to detail.",
+    subtitle: initial.subtitle || "Collections crafted for every space.",
     cta_text: initial.cta_text || "VIEW ALL CATEGORIES",
-    cta_link: initial.cta_link || "/collections",
+    cta_link: initial.cta_link || "/products",
   }));
 
   const [saving, setSaving] = useState(false);

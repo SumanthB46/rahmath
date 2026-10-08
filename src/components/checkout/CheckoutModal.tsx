@@ -15,6 +15,7 @@ import { Link } from "@tanstack/react-router";
 import { useAuth, AddressItem } from "@/hooks/useAuth";
 import { ProductItem } from "@/routes/products";
 import { toast } from "sonner";
+import { API_BASE_URL } from "@/lib/api";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -159,7 +160,7 @@ export function CheckoutModal({
         ],
       };
 
-      const res = await fetch("http://localhost:5000/api/orders/checkout", {
+      const res = await fetch(`${API_BASE_URL}/orders/checkout`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

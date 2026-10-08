@@ -10,6 +10,7 @@ import { ProductDetails } from "@/components/products/ProductDetails";
 import { TileCalculatorData } from "@/components/products/TileQuantityCalculator";
 import { useAuth } from "@/hooks/useAuth";
 import { useLenis } from "@/hooks/useLenis";
+import { useCart } from "@/context/CartContext";
 import {
   ArrowLeft,
   Search,
@@ -29,6 +30,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getPublicProducts, getPublicCategories, API_BASE_URL } from "@/lib/api";
 
 export interface ProductItem {
   id: number;
@@ -61,171 +63,15 @@ interface ProductsSearchParams {
   collection?: string;
 }
 
-const SPACE_APPLICATIONS = [
-  { id: "all", name: "All Spaces" },
-  { id: "living-room", name: "Living Room", query: "Living Room" },
-  { id: "bathroom", name: "Bathroom & Wet Areas", query: "Bathroom" },
-  { id: "kitchen", name: "Kitchen & Backsplash", query: "Kitchen" },
-  { id: "outdoor", name: "Outdoor & High Traffic", query: "Outdoor" },
-  { id: "bedroom", name: "Bedroom", query: "Bedroom" },
-  { id: "dining-room", name: "Dining Room", query: "Dining Room" },
-  { id: "commercial", name: "Commercial Spaces", query: "Commercial" },
-  { id: "staircase", name: "Staircases & Steps", query: "Staircase" },
-];
-
-const CATEGORY_TABS = [
-  { id: "all", name: "All Categories" },
-  { id: "living-room-tiles", name: "Living Room & Hall", match: ["living", "hall", "slabs", "vitrified"] },
-  { id: "bathroom-tiles", name: "Bathroom & Wet Areas", match: ["bathroom", "wet", "subway", "moroccan"] },
-  { id: "kitchen-tiles", name: "Kitchen & Dining", match: ["kitchen", "dining", "backsplash"] },
-  { id: "bedroom-tiles", name: "Bedroom", match: ["bedroom", "wooden", "plank"] },
-  { id: "outdoor-parking-tiles", name: "Outdoor & Parking", match: ["outdoor", "parking", "balcony", "pavers", "elevation"] },
-  { id: "sanitaryware", name: "Sanitaryware & Basins", match: ["sanitaryware", "basin", "sink", "toilet"] },
-];
-
-// Fallback admin tile samples if DB has 0 items or during loading
-const SAMPLE_ADMIN_TILES: ProductItem[] = [
-  {
-    id: 101,
-    name: "UniTerra Grand Format 120x240 Slabs",
-    slug: "uniterra-grand-format-120240",
-    sku: "MTC-TL-001",
-    brand: "Eternity Vitrified",
-    category_name: "Floor Tiles",
-    subcategory_name: "Living Room Tiles",
-    price: 3450,
-    size: "120x240 cm",
-    finish: "Satin Matte",
-    material: "Glazed Vitrified Porcelain",
-    thickness: "9.0 mm",
-    color: "Warm Alabaster White",
-    pieces_per_box: 1,
-    sqft_per_box: 31.0,
-    stock_quantity: 114,
-    unit: "box",
-    description: "Seamless monolithic ultra-large format glazed vitrified porcelain slabs with high scratch resistance for grand living halls.",
-  },
-  {
-    id: 102,
-    name: "Carrara Statuario Extra Marble Slab",
-    slug: "carrara-statuario-extra-marble",
-    sku: "MTC-MRB-001",
-    brand: "Mubarak Luxe",
-    category_name: "Natural Marble & Granite",
-    subcategory_name: "Living Room Tiles",
-    price: 45000,
-    size: "180x280 cm",
-    finish: "Mirror Polished",
-    material: "Italian Natural Marble",
-    thickness: "18.0 mm",
-    color: "Classic White with Grey Veins",
-    pieces_per_box: 1,
-    sqft_per_box: 54.0,
-    stock_quantity: 4,
-    unit: "slab",
-    description: "Bookmatched Italian Carrara Statuario natural marble slab for high-end architectural villas.",
-  },
-  {
-    id: 103,
-    name: "The Ultima Royal Marquina Mirror Glaze",
-    slug: "ultima-royal-marquina",
-    sku: "ULT-MARQ-80260",
-    brand: "The Ultima",
-    category_name: "Floor Tiles",
-    subcategory_name: "Living Room Tiles",
-    price: 4800,
-    size: "80x260 cm",
-    finish: "High Gloss Polished",
-    material: "Sintered Compact",
-    thickness: "9.0 mm",
-    color: "Midnight Obsidian Black",
-    pieces_per_box: 2,
-    sqft_per_box: 22.4,
-    stock_quantity: 60,
-    unit: "box",
-    description: "Deep black Spanish Marquina slab with stark white veining for contemporary living & dining halls.",
-  },
-  {
-    id: 104,
-    name: "Vitronite Crema Marfil Carving Slab",
-    slug: "vitronite-crema-marfil",
-    sku: "VIT-CREM-60120",
-    brand: "Vitronite",
-    category_name: "Floor Tiles",
-    subcategory_name: "Living Room Tiles",
-    price: 1450,
-    size: "60x120 cm",
-    finish: "Carving Matte",
-    material: "Vitrified Porcelain",
-    thickness: "8.5 mm",
-    color: "Crema Sand Beige",
-    pieces_per_box: 2,
-    sqft_per_box: 15.5,
-    stock_quantity: 120,
-    unit: "box",
-    description: "Warm beige Mediterranean marble texture with subtle tactile carving lines.",
-  },
-  {
-    id: 105,
-    name: "AquaShield Subway Aqua Gloss Tile",
-    slug: "aquashield-subway-aqua",
-    sku: "AQUA-SUB-1030",
-    brand: "Mubarak Wall",
-    category_name: "Wall Tiles",
-    subcategory_name: "Bathroom Wall Tiles",
-    price: 850,
-    size: "10x30 cm",
-    finish: "Beveled Gloss",
-    material: "Ceramic",
-    thickness: "7.0 mm",
-    color: "Aegean Sea Blue",
-    pieces_per_box: 30,
-    sqft_per_box: 9.7,
-    stock_quantity: 80,
-    unit: "box",
-    description: "Waterproof designer ceramic subway tiles for bathroom wet walls and kitchen backsplashes.",
-  },
-  {
-    id: 106,
-    name: "Grès Outdoors R11 Anti-Slip Paver 20mm",
-    slug: "gres-outdoors-paver-20mm",
-    sku: "GRES-OUT-6060",
-    brand: "Grès Eternity",
-    category_name: "Floor Tiles",
-    subcategory_name: "Outdoor & Heavy Duty",
-    price: 1950,
-    size: "60x60 cm / 20mm",
-    finish: "R11 Anti-Slip Structured",
-    material: "Full Body Porcelain",
-    thickness: "20.0 mm",
-    color: "Basalt Anthracite",
-    pieces_per_box: 2,
-    sqft_per_box: 7.75,
-    stock_quantity: 90,
-    unit: "box",
-    description: "Heavy duty 20mm thick exterior slab for patios, driveways, terraces, and garden walkways.",
-  },
-  {
-    id: 107,
-    name: "Monolith Carrara Integrated Tile Sink",
-    slug: "monolith-carrara-sink",
-    sku: "MONO-SINK-CARR",
-    brand: "Kerovit Custom",
-    category_name: "Sanitaryware",
-    subcategory_name: "Wash Basins",
-    price: 14500,
-    size: "60x45x12 cm",
-    finish: "Handcrafted Matte",
-    material: "Sintered Stone Basin",
-    thickness: "12.0 mm",
-    color: "Carrara Veined White",
-    pieces_per_box: 1,
-    sqft_per_box: 1,
-    stock_quantity: 15,
-    unit: "piece",
-    description: "Precision-milled seamless countertop basin fabricated from continuous porcelain slab.",
-  },
-];
+export interface CategoryItem {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  image?: string;
+  product_count?: number;
+  subcategories?: { id: number; name: string; slug: string; is_active: boolean }[];
+}
 
 export const Route = createFileRoute("/products")({
   validateSearch: (search: Record<string, unknown>): ProductsSearchParams => {
@@ -261,9 +107,12 @@ function ProductsPage() {
   const searchParams = Route.useSearch();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const { addToCart } = useCart();
 
   const [dbProducts, setDbProducts] = useState<ProductItem[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [activeSpace, setActiveSpace] = useState<string>(searchParams.application || "all");
   const [activeCategory, setActiveCategory] = useState<string>(searchParams.category || "all");
@@ -325,61 +174,65 @@ function ProductsPage() {
     }
   }, [user]);
 
-  // Fetch real products from PostgreSQL API
-  useEffect(() => {
-    let isMounted = true;
-    async function loadProducts() {
-      try {
-        setLoading(true);
-        const res = await fetch("http://localhost:5000/api/products").then((r) => r.json());
-        if (isMounted && res.success && Array.isArray(res.products) && res.products.length > 0) {
-          setDbProducts(res.products);
-        } else if (isMounted) {
-          setDbProducts(SAMPLE_ADMIN_TILES);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setDbProducts(SAMPLE_ADMIN_TILES);
-        }
-      } finally {
-        if (isMounted) setLoading(false);
+  // Load products and categories from API
+  const loadCatalogData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [prodRes, catRes] = await Promise.all([
+        getPublicProducts({ limit: 200 }),
+        getPublicCategories(),
+      ]);
+
+      if (prodRes && prodRes.success && Array.isArray(prodRes.products)) {
+        setDbProducts(prodRes.products);
+      } else {
+        setDbProducts([]);
       }
+
+      if (catRes && catRes.success && Array.isArray(catRes.categories)) {
+        setCategories(catRes.categories);
+      } else {
+        setCategories([]);
+      }
+    } catch (err: any) {
+      console.error("Failed to load catalog data:", err);
+      setError(err?.message || "Unable to load products. Please check connection.");
+      setDbProducts([]);
+      setCategories([]);
+    } finally {
+      setLoading(false);
     }
-    loadProducts();
-    return () => {
-      isMounted = false;
-    };
+  };
+
+  useEffect(() => {
+    loadCatalogData();
   }, []);
 
   // Filter products for Catalog view
   const filteredProducts = useMemo(() => {
-    let list = dbProducts.length > 0 ? dbProducts : SAMPLE_ADMIN_TILES;
+    let list = dbProducts;
 
     if (activeSpace && activeSpace !== "all") {
       const q = activeSpace.toLowerCase();
       list = list.filter((p) => {
         const text = `${p.name} ${p.subcategory_name || ""} ${p.category_name || ""} ${p.description || ""}`.toLowerCase();
-        if (q.includes("living")) return text.includes("living") || text.includes("floor") || text.includes("statuario") || text.includes("slab") || text.includes("marfil");
-        if (q.includes("bathroom")) return text.includes("bathroom") || text.includes("aqua") || text.includes("wet") || text.includes("subway") || text.includes("basin");
-        if (q.includes("kitchen")) return text.includes("kitchen") || text.includes("subway") || text.includes("backsplash") || text.includes("counter");
-        if (q.includes("outdoor")) return text.includes("outdoor") || text.includes("paver") || text.includes("terrace") || text.includes("anti-slip") || text.includes("heavy");
-        if (q.includes("bedroom")) return text.includes("bedroom") || text.includes("wood") || text.includes("floor") || text.includes("silk");
-        if (q.includes("dining")) return text.includes("dining") || text.includes("marquina") || text.includes("high gloss") || text.includes("floor");
-        if (q.includes("commercial")) return text.includes("commercial") || text.includes("heavy") || text.includes("gres") || text.includes("paver");
-        if (q.includes("staircase")) return text.includes("stair") || text.includes("step") || text.includes("tread") || text.includes("anti-skid");
         return text.includes(q);
       });
     }
 
     if (activeCategory && activeCategory !== "all") {
       const catKey = activeCategory.toLowerCase();
-      const tabConfig = CATEGORY_TABS.find((t) => t.id === catKey);
-      if (tabConfig && tabConfig.match) {
-        list = list.filter((p) => {
-          const catText = `${p.category_name || ""} ${p.subcategory_name || ""} ${p.name}`.toLowerCase();
-          return tabConfig.match.some((m) => catText.includes(m));
-        });
-      }
+      list = list.filter((p) => {
+        const catName = (p.category_name || "").toLowerCase();
+        const subName = (p.subcategory_name || "").toLowerCase();
+        return (
+          catName === catKey ||
+          subName === catKey ||
+          catName.includes(catKey) ||
+          subName.includes(catKey)
+        );
+      });
     }
 
     if (searchQuery.trim()) {
@@ -395,8 +248,7 @@ function ProductsPage() {
   // Find currently active product if `id` search param is present
   const selectedProduct = useMemo(() => {
     if (!searchParams.id) return null;
-    const all = dbProducts.length > 0 ? dbProducts : SAMPLE_ADMIN_TILES;
-    return all.find((p) => String(p.id) === String(searchParams.id)) || null;
+    return dbProducts.find((p) => String(p.id) === String(searchParams.id)) || null;
   }, [searchParams.id, dbProducts]);
 
   const handleOpenProduct = (prodId: number | string) => {
@@ -430,10 +282,23 @@ function ProductsPage() {
       totalPrice: calc.totalPrice,
     };
 
+    // Add to global cart
+    addToCart({
+      id: product.id,
+      name: product.name,
+      image: product.images?.[0] || "/assets/marble-slabs-corner-v2.png",
+      price: Number(product.price),
+      quantity: calc.boxes,
+      unit: product.unit || "box",
+      specs: `${calc.boxes} ${product.unit === "piece" ? "Piece(s)" : "Box(es)"} · ${calc.totalSqft} Sq.ft`,
+      dimensions: product.size,
+      totalSqft: calc.totalSqft,
+      category: product.category_name,
+    });
+
     if (!isAuthenticated) {
       setPendingCheckout(payload);
       setAuthModalOpen(true);
-      toast.info("Please sign in or create an account to proceed to checkout.");
     } else {
       setCheckoutPayload(payload);
       setOrderCompletedResult(null);
@@ -486,7 +351,7 @@ function ProductsPage() {
         ],
       };
 
-      const res = await fetch("http://localhost:5000/api/orders/checkout", {
+      const res = await fetch(`${API_BASE_URL}/orders/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderPayload),
@@ -556,6 +421,13 @@ function ProductsPage() {
                 />
               </div>
             )}
+
+            <Link
+              to="/sinks"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-amber-800/30 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold uppercase tracking-wider transition-colors shrink-0"
+            >
+              <span>Sinks &amp; Basins</span>
+            </Link>
 
             <Link
               to="/catalog"
@@ -663,30 +535,65 @@ function ProductsPage() {
             </p>
           </div>
 
-          {/* Filter Bar: Spaces */}
+          {/* Dynamic Filter Bar: Categories from Database */}
           <div className="mb-8 space-y-3 bg-white p-4 sm:p-5 rounded-2xl border border-stone-200/80 shadow-xs">
-            <div className="flex items-center gap-2 text-stone-400 text-xs font-semibold uppercase tracking-wider mb-1">
-              <Filter className="h-3.5 w-3.5 text-amber-700" />
-              <span>Filter by Space Purpose</span>
+            <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1">
+              <div className="flex items-center gap-2">
+                <Filter className="h-3.5 w-3.5 text-amber-700" />
+                <span>Categories</span>
+              </div>
+              {categories.length > 0 && (
+                <span className="text-[11px] font-mono text-stone-400 font-normal lowercase">
+                  {categories.length} categories active
+                </span>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {SPACE_APPLICATIONS.map((space) => {
+              <button
+                onClick={() => {
+                  setActiveCategory("all");
+                  setActiveSpace("all");
+                }}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                  activeCategory === "all" && activeSpace === "all"
+                    ? "bg-stone-900 text-white font-semibold shadow-xs"
+                    : "bg-stone-100 text-stone-700 hover:bg-stone-200 hover:text-stone-900"
+                }`}
+              >
+                All Products ({dbProducts.length})
+              </button>
+
+              {categories.map((cat) => {
                 const isSelected =
-                  (space.id === "all" && activeSpace === "all") ||
-                  (space.query && activeSpace.toLowerCase().includes(space.query.toLowerCase()));
+                  activeCategory === String(cat.id) ||
+                  activeCategory.toLowerCase() === cat.name.toLowerCase() ||
+                  activeCategory.toLowerCase() === cat.slug.toLowerCase() ||
+                  activeSpace.toLowerCase() === cat.name.toLowerCase();
 
                 return (
                   <button
-                    key={space.id}
-                    onClick={() => setActiveSpace(space.id === "all" ? "all" : space.name)}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                    key={cat.id}
+                    onClick={() => {
+                      setActiveCategory(cat.name);
+                      setActiveSpace("all");
+                    }}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                       isSelected
                         ? "bg-stone-900 text-white font-semibold shadow-xs"
                         : "bg-stone-100 text-stone-700 hover:bg-stone-200 hover:text-stone-900"
                     }`}
                   >
-                    {space.name}
+                    <span>{cat.name}</span>
+                    {typeof cat.product_count === "number" && (
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                          isSelected ? "bg-stone-700 text-white" : "bg-stone-200/80 text-stone-600"
+                        }`}
+                      >
+                        {cat.product_count}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -702,12 +609,27 @@ function ProductsPage() {
               <span>Click any card to calculate box quantity</span>
             </div>
 
-            {filteredProducts.length === 0 ? (
+            {loading ? (
+              <div className="py-20 text-center space-y-4 bg-white rounded-3xl border border-stone-200/80 my-4">
+                <Loader2 className="h-10 w-10 text-amber-700 animate-spin mx-auto" />
+                <p className="text-sm font-medium text-stone-600">Loading catalog from database...</p>
+              </div>
+            ) : error ? (
+              <div className="bg-red-50/70 border border-red-200 rounded-3xl p-10 text-center space-y-4 my-6">
+                <p className="text-sm text-red-700 font-medium">{error}</p>
+                <button
+                  onClick={loadCatalogData}
+                  className="px-5 py-2 bg-stone-900 text-white rounded-full text-xs font-semibold hover:bg-stone-800 transition-colors cursor-pointer"
+                >
+                  Retry Loading
+                </button>
+              </div>
+            ) : filteredProducts.length === 0 ? (
               <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center space-y-4 my-8">
                 <Package className="h-12 w-12 text-stone-300 mx-auto stroke-1" />
                 <h3 className="text-lg font-serif font-bold text-stone-800">No matching products found</h3>
                 <p className="text-xs text-stone-500 max-w-md mx-auto">
-                  No tiles match your current filter. Try choosing another space or clear your search query.
+                  No tiles match your current filter. Try choosing another category or clearing your search query.
                 </p>
               </div>
             ) : (

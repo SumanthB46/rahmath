@@ -26,9 +26,53 @@ export interface CustomerUser {
   status?: string;
 }
 
+export interface CustomerOrderItem {
+  id: number;
+  product_id?: number;
+  product_name: string;
+  sku?: string;
+  price: number;
+  quantity: number;
+  unit?: string;
+  total: number;
+  product_image?: string;
+}
+
+export interface CustomerOrder {
+  id: number;
+  order_number: string;
+  user_id?: number;
+  customer_name: string;
+  customer_email?: string;
+  customer_phone: string;
+  shipping_address: string;
+  shipping_city: string;
+  shipping_state: string;
+  shipping_pincode: string;
+  product_total: number;
+  product_payment_status: string;
+  order_status: string;
+  created_at: string;
+  items?: CustomerOrderItem[];
+  delivery?: {
+    partner?: string;
+    partner_name?: string;
+    delivery_charge?: number;
+    delivery_status?: string;
+    tracking_number?: string;
+    expected_delivery_date?: string;
+  };
+}
+
 export const CUSTOMER_TOKEN_KEY = "customer_token";
 export const CUSTOMER_USER_KEY = "customer_user";
 export const CUSTOMER_ADDRESSES_KEY = "customer_addresses";
+
+function notifyAuthChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("mubarak_auth_changed"));
+  }
+}
 
 export function useCustomerAuth() {
   const [user, setUser] = useState<CustomerUser | null>(() => {
@@ -74,7 +118,11 @@ export function useCustomerAuth() {
       }
     };
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    window.addEventListener("mubarak_auth_changed", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("mubarak_auth_changed", handleStorage);
+    };
   }, []);
 
   // Send Phone OTP
@@ -127,6 +175,7 @@ export function useCustomerAuth() {
       localStorage.setItem(CUSTOMER_USER_KEY, JSON.stringify(userData));
       localStorage.setItem(CUSTOMER_TOKEN_KEY, authToken);
       localStorage.setItem(CUSTOMER_ADDRESSES_KEY, JSON.stringify(userAddrs));
+      notifyAuthChanged();
 
       return {
         user: userData,
@@ -166,6 +215,7 @@ export function useCustomerAuth() {
       };
       setUser(updatedUser);
       localStorage.setItem(CUSTOMER_USER_KEY, JSON.stringify(updatedUser));
+      notifyAuthChanged();
       return updatedUser;
     } catch (err: any) {
       toast.error(err.message || "Profile update failed.");
@@ -186,6 +236,7 @@ export function useCustomerAuth() {
       if (res.success && Array.isArray(res.addresses)) {
         setAddresses(res.addresses);
         localStorage.setItem(CUSTOMER_ADDRESSES_KEY, JSON.stringify(res.addresses));
+        notifyAuthChanged();
         return res.addresses;
       }
       return [];
@@ -225,6 +276,7 @@ export function useCustomerAuth() {
       const updatedList = [newAddr, ...addresses.filter((a) => a.id !== newAddr.id)];
       setAddresses(updatedList);
       localStorage.setItem(CUSTOMER_ADDRESSES_KEY, JSON.stringify(updatedList));
+      notifyAuthChanged();
 
       toast.success("Delivery address saved successfully");
       return newAddr;
@@ -233,6 +285,93 @@ export function useCustomerAuth() {
       throw err;
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Update Existing Address
+  const updateAddress = async (id: number, data: Partial<AddressItem>) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/addresses/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify(data),
+      }).then((r) => r.json());
+
+      if (!res.success) {
+        throw new Error(res.message || "Failed to update address.");
+      }
+
+      const updatedAddr: AddressItem = res.address;
+      const updatedList = addresses.map((a) => {
+        if (data.is_default) {
+          return a.id === id ? updatedAddr : { ...a, is_default: false };
+        }
+        return a.id === id ? updatedAddr : a;
+      });
+      setAddresses(updatedList);
+      localStorage.setItem(CUSTOMER_ADDRESSES_KEY, JSON.stringify(updatedList));
+      notifyAuthChanged();
+
+      toast.success("Address updated successfully");
+      return updatedAddr;
+    } catch (err: any) {
+      toast.error(err.message || "Could not update address.");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete Address
+  const deleteAddress = async (id: number) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/addresses/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      }).then((r) => r.json());
+
+      if (!res.success) {
+        throw new Error(res.message || "Failed to delete address.");
+      }
+
+      const updatedList = addresses.filter((a) => a.id !== id);
+      setAddresses(updatedList);
+      localStorage.setItem(CUSTOMER_ADDRESSES_KEY, JSON.stringify(updatedList));
+      notifyAuthChanged();
+
+      toast.success("Address deleted successfully");
+      return true;
+    } catch (err: any) {
+      toast.error(err.message || "Could not delete address.");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch Customer's Orders
+  const fetchOrders = async (): Promise<CustomerOrder[]> => {
+    if (!token) return [];
+    try {
+      const res = await fetch(`${API_BASE_URL}/orders/my/orders`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }).then((r) => r.json());
+
+      if (res.success && Array.isArray(res.orders)) {
+        return res.orders;
+      }
+      return [];
+    } catch {
+      return [];
     }
   };
 
@@ -258,6 +397,7 @@ export function useCustomerAuth() {
       setToken(res.token);
       localStorage.setItem(CUSTOMER_USER_KEY, JSON.stringify(userData));
       localStorage.setItem(CUSTOMER_TOKEN_KEY, res.token);
+      notifyAuthChanged();
       toast.success("Welcome back!", { description: `Logged in as ${userData.name || userData.email}` });
       return userData;
     } catch (err: any) {
@@ -290,6 +430,7 @@ export function useCustomerAuth() {
       setToken(res.token);
       localStorage.setItem(CUSTOMER_USER_KEY, JSON.stringify(userData));
       localStorage.setItem(CUSTOMER_TOKEN_KEY, res.token);
+      notifyAuthChanged();
       toast.success("Account created successfully", { description: `Welcome, ${userData.name}!` });
       return userData;
     } catch (err: any) {
@@ -307,6 +448,7 @@ export function useCustomerAuth() {
     localStorage.removeItem(CUSTOMER_USER_KEY);
     localStorage.removeItem(CUSTOMER_TOKEN_KEY);
     localStorage.removeItem(CUSTOMER_ADDRESSES_KEY);
+    notifyAuthChanged();
     toast.info("Signed out of customer account");
   }, []);
 
@@ -325,6 +467,9 @@ export function useCustomerAuth() {
     updateProfile,
     fetchAddresses,
     saveAddress,
+    updateAddress,
+    deleteAddress,
+    fetchOrders,
     logout,
   };
 }

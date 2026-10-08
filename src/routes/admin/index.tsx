@@ -32,9 +32,15 @@ function AdminDashboardPage() {
   const fetchStats = async (isManual = false) => {
     if (isManual) setRefreshing(true);
     try {
-      const res = await api.admin.getDashboardStats();
+      const res: any = await api.admin.getDashboardStats();
       if (res.data) {
         setData(res.data);
+      } else if (res.stats) {
+        setData({
+          stats: res.stats,
+          recentOrders: res.stats.recent_orders || [],
+          lowStockList: res.stats.low_stock_products || [],
+        });
       }
       if (isManual) toast.success("Dashboard refreshed");
     } catch (err: any) {

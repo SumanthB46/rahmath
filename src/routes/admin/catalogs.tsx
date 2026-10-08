@@ -26,8 +26,16 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import api, { uploadCatalogPdf, uploadImage } from "@/lib/api";
+import api, { API_BASE_URL, uploadCatalogPdf, uploadImage } from "@/lib/api";
 import { toast } from "sonner";
+
+const resolveMediaUrl = (url?: string) => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) return url;
+  const backendOrigin = API_BASE_URL.replace(/\/api\/?$/, "");
+  if (url.startsWith("/uploads")) return `${backendOrigin}${url}`;
+  return url;
+};
 
 export const Route = createFileRoute("/admin/catalogs")({
   head: () => ({
@@ -764,7 +772,7 @@ function AdminCatalogLibraryPage() {
                             {/* View Spec / PDF */}
                             {cat.pdf_url && (
                               <a
-                                href={cat.pdf_url}
+                                href={resolveMediaUrl(cat.pdf_url)}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors"
@@ -804,21 +812,22 @@ function AdminCatalogLibraryPage() {
 
         {/* ── MODAL 1: ADD / EDIT SECTION ── */}
         {isSectionModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl relative">
-              <div className="flex items-center justify-between border-b border-stone-200 pb-4">
-                <h3 className="text-lg font-serif font-bold text-stone-900 uppercase tracking-tight">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl relative my-auto border border-stone-200 overflow-hidden">
+              <div className="flex items-center justify-between border-b border-stone-200 px-6 py-4 shrink-0 bg-stone-50/70">
+                <h3 className="text-base sm:text-lg font-serif font-bold text-stone-900 uppercase tracking-tight">
                   {editingSection ? "Edit Catalogue Section" : "Add Catalogue Section"}
                 </h3>
                 <button
+                  type="button"
                   onClick={() => setIsSectionModalOpen(false)}
-                  className="p-1 text-stone-400 hover:text-stone-600 rounded-lg hover:bg-stone-100"
+                  className="p-1.5 text-stone-400 hover:text-stone-700 rounded-lg hover:bg-stone-100 transition-colors"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleSaveSection} className="space-y-4">
+              <form id="section-form" onSubmit={handleSaveSection} className="overflow-y-auto px-6 py-5 space-y-4 flex-1">
                 {/* Section Name */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-mono uppercase tracking-wider text-stone-700 font-bold block">
@@ -878,37 +887,38 @@ function AdminCatalogLibraryPage() {
                     </label>
                   </div>
                 </div>
-
-                {/* Actions */}
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-stone-200">
-                  <button
-                    type="button"
-                    onClick={() => setIsSectionModalOpen(false)}
-                    className="px-4 py-2.5 rounded-lg border border-stone-200 text-xs font-semibold text-stone-600 hover:bg-stone-50 uppercase tracking-wider"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="px-5 py-2.5 rounded-lg bg-stone-900 text-white text-xs font-semibold uppercase tracking-wider hover:bg-black transition-all flex items-center gap-2"
-                  >
-                    {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                    <span>{editingSection ? "Save Changes" : "Create Section"}</span>
-                  </button>
-                </div>
               </form>
+
+              {/* Actions (Always visible pinned footer) */}
+              <div className="border-t border-stone-200 px-6 py-4 shrink-0 bg-stone-50/95 backdrop-blur-xs flex items-center justify-end gap-3 shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => setIsSectionModalOpen(false)}
+                  className="px-5 py-2.5 rounded-lg border border-stone-300 bg-white hover:bg-stone-100 text-xs font-bold text-stone-700 uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  form="section-form"
+                  disabled={saving}
+                  className="px-6 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                >
+                  {saving && <Loader2 className="h-4 w-4 animate-spin text-white" />}
+                  <span>{editingSection ? "Save Changes" : "Create Section"}</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {/* ── MODAL 2: ADD / EDIT CATALOGUE ── */}
         {isCatalogModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in overflow-y-auto">
-            <div className="bg-white rounded-2xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative my-8">
-              <div className="flex items-center justify-between border-b border-stone-200 pb-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl relative my-auto border border-stone-200 overflow-hidden">
+              <div className="flex items-center justify-between border-b border-stone-200 px-6 py-4 shrink-0 bg-stone-50/70">
                 <div>
-                  <h3 className="text-lg font-serif font-bold text-stone-900 uppercase tracking-tight">
+                  <h3 className="text-base sm:text-lg font-serif font-bold text-stone-900 uppercase tracking-tight">
                     {editingCatalog ? "Edit Catalogue" : "Add Catalogue"}
                   </h3>
                   <p className="text-xs text-stone-500">
@@ -916,14 +926,15 @@ function AdminCatalogLibraryPage() {
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setIsCatalogModalOpen(false)}
-                  className="p-1 text-stone-400 hover:text-stone-600 rounded-lg hover:bg-stone-100"
+                  className="p-1.5 text-stone-400 hover:text-stone-700 rounded-lg hover:bg-stone-100 transition-colors"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleSaveCatalog} className="space-y-4">
+              <form id="catalog-form" onSubmit={handleSaveCatalog} className="overflow-y-auto px-6 py-5 space-y-4 flex-1">
                 {/* Parent Section */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-mono uppercase tracking-wider text-stone-700 font-bold block">
@@ -1061,6 +1072,9 @@ function AdminCatalogLibraryPage() {
                         src={catalogForm.cover_image || "/assets/stacked_grey_slabs.png"}
                         alt="Cover preview"
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/assets/stacked_grey_slabs.png";
+                        }}
                       />
                     </div>
                     <input
@@ -1122,14 +1136,14 @@ function AdminCatalogLibraryPage() {
                 </div>
 
                 {/* Featured and Status Toggles */}
-                <div className="grid grid-cols-2 gap-4 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                   <div className="border border-amber-200 bg-amber-50/40 p-3 rounded-xl flex items-center justify-between">
                     <div>
                       <span className="text-xs font-mono uppercase tracking-wider text-amber-900 font-bold block">
                         Featured Edition
                       </span>
                       <span className="text-[11px] text-amber-700">
-                        Display as oversized centerpiece
+                        Display as centerpiece
                       </span>
                     </div>
                     <label className="cursor-pointer">
@@ -1162,25 +1176,27 @@ function AdminCatalogLibraryPage() {
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-stone-200">
-                  <button
-                    type="button"
-                    onClick={() => setIsCatalogModalOpen(false)}
-                    className="px-4 py-2.5 rounded-lg border border-stone-200 text-xs font-semibold text-stone-600 hover:bg-stone-50 uppercase tracking-wider"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="px-5 py-2.5 rounded-lg bg-stone-900 text-white text-xs font-semibold uppercase tracking-wider hover:bg-black transition-all flex items-center gap-2"
-                  >
-                    {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                    <span>{editingCatalog ? "Save Catalogue" : "Add Catalogue"}</span>
-                  </button>
-                </div>
               </form>
+
+              {/* Actions (Always visible pinned footer) */}
+              <div className="border-t border-stone-200 px-6 py-4 shrink-0 bg-stone-50/95 backdrop-blur-xs flex items-center justify-end gap-3 shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => setIsCatalogModalOpen(false)}
+                  className="px-5 py-2.5 rounded-lg border border-stone-300 bg-white hover:bg-stone-100 text-xs font-bold text-stone-700 uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  form="catalog-form"
+                  disabled={saving || uploadingCover || uploadingPdf}
+                  className="px-6 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                >
+                  {saving && <Loader2 className="h-4 w-4 animate-spin text-white" />}
+                  <span>{editingCatalog ? "Save Catalogue" : "Add Catalogue"}</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

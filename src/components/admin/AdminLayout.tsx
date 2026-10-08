@@ -23,6 +23,7 @@ import {
   LayoutGrid,
   BookOpen,
   Film,
+  MessageSquare,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import api from "@/lib/api";
@@ -42,6 +43,7 @@ const NAV_ITEMS = [
   { name: "Orders", href: "/admin/orders", icon: ShoppingBag },
   { name: "Delivery", href: "/admin/delivery", icon: Truck },
   { name: "Inventory", href: "/admin/inventory", icon: Boxes },
+  { name: "Inquiries", href: "/admin/inquiries", icon: MessageSquare },
   { name: "Customers", href: "/admin/customers", icon: Users },
   { name: "Discounts", href: "/admin/discounts", icon: Percent },
   { name: "Reviews", href: "/admin/reviews", icon: Star },

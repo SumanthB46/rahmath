@@ -90,9 +90,6 @@ export function Footer() {
             <Link to="/products" className="hover:text-amber-800 transition-colors">
               Products Catalog
             </Link>
-            <Link to="/collections" className="hover:text-amber-800 transition-colors">
-              Collections
-            </Link>
             <Link to="/sinks" className="hover:text-amber-800 transition-colors">
               Sinks &amp; Basins
             </Link>

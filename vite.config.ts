@@ -12,4 +12,17 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    build: {
+      rollupOptions: {
+        external: ["canvas"],
+      },
+      rolldownOptions: {
+        external: ["canvas"],
+      },
+    },
+    ssr: {
+      external: ["canvas"],
+    },
+  },
 });

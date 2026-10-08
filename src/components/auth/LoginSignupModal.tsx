@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   Phone,
@@ -7,14 +8,11 @@ import {
   ArrowRight,
   Loader2,
   Sparkles,
-  MapPin,
   User as UserIcon,
-  Mail,
-  Building2,
+  RefreshCw,
 } from "lucide-react";
-import { useAuth, AddressItem } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import stoneSlabsImg from "@/assets/stacked_grey_slabs.png";
 
 interface LoginSignupModalProps {
   isOpen: boolean;
@@ -22,26 +20,18 @@ interface LoginSignupModalProps {
   onSuccess?: () => void;
 }
 
-type AuthStep = "phone" | "otp" | "details" | "address";
+type AuthStep = "phone" | "otp" | "name";
 
 export function LoginSignupModal({
   isOpen,
   onClose,
   onSuccess,
 }: LoginSignupModalProps) {
-  const {
-    sendPhoneOtp,
-    verifyPhoneOtp,
-    updateProfile,
-    saveAddress,
-    loading,
-    user,
-    addresses,
-  } = useAuth();
+  const { sendPhoneOtp, verifyPhoneOtp, updateProfile, loading } = useAuth();
 
   const [step, setStep] = useState<AuthStep>("phone");
   const [phone, setPhone] = useState("");
-  const [whatsappConsent, setWhatsappConsent] = useState(true);
+  const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
 
   // OTP State (6 digits)
   const [otpDigits, setOtpDigits] = useState(["", "", "", "", "", ""]);
@@ -49,24 +39,11 @@ export function LoginSignupModal({
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
 
-  // Customer Basic Details State
-  const [customerName, setCustomerName] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
-
-  // Address State
-  const [fullName, setFullName] = useState("");
-  const [addressPhone, setAddressPhone] = useState("");
-  const [addressLine, setAddressLine] = useState("");
-  const [area, setArea] = useState("");
-  const [city, setCity] = useState("Bengaluru");
-  const [state, setState] = useState("Karnataka");
-  const [pincode, setPincode] = useState("560001");
-  const [landmark, setLandmark] = useState("");
-
-  // Error message
+  // Optional Name Prompt for new accounts
+  const [userName, setUserName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Timer countdown effect
+  // Countdown timer for OTP
   useEffect(() => {
     let interval: any = null;
     if (step === "otp" && timer > 0) {
@@ -87,15 +64,27 @@ export function LoginSignupModal({
       setOtpDigits(["", "", "", "", "", ""]);
       setTimer(30);
       setCanResend(false);
+      setDevOtpHint(null);
     }
   }, [isOpen]);
+
+  // Handle escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   const cleanPhone = phone.replace(/\D/g, "").slice(0, 10);
   const isPhoneValid = cleanPhone.length === 10;
 
-  // STEP 1: Handle Send OTP
+  // STEP 1: Send OTP
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isPhoneValid) {
@@ -109,19 +98,33 @@ export function LoginSignupModal({
       setStep("otp");
       setTimer(30);
       setCanResend(false);
+      setDevOtpHint(res.devOtp || (cleanPhone === "9876543210" ? "123456" : null));
       toast.success(`OTP sent to +91 ${cleanPhone}`, {
-        description: res.devOtp ? `(Dev OTP: ${res.devOtp})` : "Enter the 6-digit code to verify.",
+        description: res.devOtp ? `(Dev OTP: ${res.devOtp})` : "Enter the 6-digit code to continue.",
       });
-      // Focus first OTP input
-      setTimeout(() => otpInputsRef.current[0]?.focus(), 100);
+      setTimeout(() => otpInputsRef.current[0]?.focus(), 150);
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to send OTP. Please try again.");
     }
   };
 
-  // STEP 2: Handle OTP Input & Verification
+  // STEP 2: Handle OTP input
   const handleOtpChange = (index: number, value: string) => {
-    const char = value.replace(/\D/g, "").slice(-1);
+    // Handle paste event of 6 digits
+    const cleanVal = value.replace(/\D/g, "");
+    if (cleanVal.length > 1) {
+      const pasted = cleanVal.slice(0, 6).split("");
+      const newOtp = [...otpDigits];
+      pasted.forEach((ch, idx) => {
+        if (idx < 6) newOtp[idx] = ch;
+      });
+      setOtpDigits(newOtp);
+      const nextIdx = Math.min(pasted.length, 5);
+      otpInputsRef.current[nextIdx]?.focus();
+      return;
+    }
+
+    const char = cleanVal.slice(-1);
     const newOtp = [...otpDigits];
     newOtp[index] = char;
     setOtpDigits(newOtp);
@@ -137,6 +140,7 @@ export function LoginSignupModal({
     }
   };
 
+  // STEP 2: Verify OTP
   const handleVerifyOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const otpCode = otpDigits.join("");
@@ -148,23 +152,13 @@ export function LoginSignupModal({
     setErrorMessage("");
     try {
       const res = await verifyPhoneOtp(cleanPhone, otpCode);
-      toast.success("Phone verified successfully!");
-
-      // Check if existing customer with complete profile & addresses
-      if (!res.isNew && res.hasProfile && res.addresses && res.addresses.length > 0) {
-        onClose();
-        if (onSuccess) onSuccess();
-      } else if (!res.hasProfile && (!res.user.name || res.user.name.startsWith("Customer "))) {
-        // Show Customer Details Step
-        setCustomerName(res.user.name?.startsWith("Customer ") ? "" : res.user.name || "");
-        setCustomerEmail(res.user.email || "");
-        setStep("details");
-      } else if (!res.addresses || res.addresses.length === 0) {
-        // Show Address Step
-        setFullName(res.user.name || "");
-        setAddressPhone(cleanPhone);
-        setStep("address");
+      // If user has no name registered yet, ask friendly name prompt
+      if (!res.user.name || res.user.name.startsWith("Customer ") || res.user.name.trim() === "") {
+        setStep("name");
       } else {
+        toast.success("Welcome back!", {
+          description: `Signed in as ${res.user.name || "+91 " + cleanPhone}`,
+        });
         onClose();
         if (onSuccess) onSuccess();
       }
@@ -173,6 +167,7 @@ export function LoginSignupModal({
     }
   };
 
+  // Resend OTP
   const handleResendOtp = async () => {
     if (!canResend) return;
     setErrorMessage("");
@@ -181,513 +176,264 @@ export function LoginSignupModal({
       setTimer(30);
       setCanResend(false);
       setOtpDigits(["", "", "", "", "", ""]);
-      toast.success("New OTP sent successfully!", {
-        description: res.devOtp ? `(Dev OTP: ${res.devOtp})` : undefined,
-      });
+      setDevOtpHint(res.devOtp || null);
+      toast.success("New OTP sent successfully!");
       otpInputsRef.current[0]?.focus();
     } catch (err: any) {
       setErrorMessage(err.message || "Could not resend OTP.");
     }
   };
 
-  // STEP 3: Handle Customer Details Save
-  const handleSaveDetails = async (e: React.FormEvent) => {
+  // STEP 3 (Optional): Save Customer Name
+  const handleSaveName = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName.trim()) {
-      setErrorMessage("Please enter your full name.");
-      return;
+    if (userName.trim()) {
+      try {
+        await updateProfile({ name: userName.trim() });
+      } catch {
+        // Non-blocking
+      }
     }
-
-    setErrorMessage("");
-    try {
-      await updateProfile({
-        name: customerName.trim(),
-        email: customerEmail.trim() || undefined,
-      });
-
-      // Proceed to Address Step
-      setFullName(customerName.trim());
-      setAddressPhone(cleanPhone);
-      setStep("address");
-    } catch (err: any) {
-      setErrorMessage(err.message || "Failed to update profile.");
-    }
+    toast.success("Welcome to Mubarak Tiles & Ceramics!");
+    onClose();
+    if (onSuccess) onSuccess();
   };
 
-  // STEP 4: Handle Save Address
-  const handleSaveAddress = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fullName || !addressPhone || !addressLine || !city || !state || !pincode) {
-      setErrorMessage("Please fill in all required delivery address fields.");
-      return;
-    }
-
-    if (pincode.replace(/\D/g, "").length !== 6) {
-      setErrorMessage("Please enter a valid 6-digit postal pincode.");
-      return;
-    }
-
-    setErrorMessage("");
-    try {
-      await saveAddress({
-        full_name: fullName.trim(),
-        phone: addressPhone.replace(/\D/g, "").slice(-10),
-        address_line: addressLine.trim(),
-        area: area.trim() || undefined,
-        city: city.trim(),
-        state: state.trim(),
-        pincode: pincode.trim(),
-        landmark: landmark.trim() || undefined,
-        is_default: true,
-      });
-
-      onClose();
-      if (onSuccess) onSuccess();
-    } catch (err: any) {
-      setErrorMessage(err.message || "Failed to save delivery address.");
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+  const modalContent = (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200"
+      onClick={onClose}
+    >
       <div
-        className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl bg-white shadow-2xl border border-stone-200 grid grid-cols-1 md:grid-cols-12"
+        className="relative w-full max-w-md my-auto overflow-hidden rounded-3xl bg-[#FAF8F5] border border-stone-200 shadow-2xl p-6 sm:p-8 text-stone-900 animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 z-20 p-2 rounded-full bg-white/90 hover:bg-stone-100 text-stone-500 hover:text-stone-900 transition-colors shadow-xs"
-          aria-label="Close"
+          type="button"
+          className="absolute right-4 top-4 rounded-full p-2 text-stone-400 hover:bg-stone-200/70 hover:text-stone-800 transition-colors"
+          aria-label="Close modal"
         >
           <X className="h-5 w-5" />
         </button>
 
-        {/* LEFT COLUMN: BRAND IMAGE BANNER (Desktop Only) */}
-        <div className="hidden md:flex md:col-span-5 relative bg-stone-900 text-white flex-col justify-between p-8 overflow-hidden">
-          <img
-            src={stoneSlabsImg}
-            alt="Mubarak Studio Slabs"
-            className="absolute inset-0 w-full h-full object-cover opacity-35"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/70 to-transparent" />
-
-          {/* Top Logo / Brand */}
-          <div className="relative z-10 space-y-1">
-            <span className="text-[10px] font-bold tracking-[0.28em] text-amber-400 uppercase font-mono block">
-              MUBARAK CERAMIC STUDIO
-            </span>
-            <h3 className="text-2xl font-serif font-bold text-white tracking-tight">
-              Architectural Surfaces &amp; Tiles
-            </h3>
+        {/* Brand Header */}
+        <div className="text-center space-y-1.5 mb-6">
+          <div className="inline-flex items-center justify-center h-11 w-11 rounded-full bg-amber-100 text-amber-900 mb-1 shadow-xs">
+            <Sparkles className="h-5 w-5" />
           </div>
-
-          {/* Bottom Highlights */}
-          <div className="relative z-10 space-y-3">
-            <div className="flex items-center gap-2.5 text-xs text-stone-300">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-              <span>Instant whole-box coverage &amp; inventory reserve</span>
-            </div>
-            <div className="flex items-center gap-2.5 text-xs text-stone-300">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-              <span>Direct consignments &amp; insured partner delivery</span>
-            </div>
-            <div className="flex items-center gap-2.5 text-xs text-stone-300">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-              <span>Separate transport charge with Porter &amp; VRL</span>
-            </div>
-          </div>
+          <span className="block text-[10px] font-mono uppercase tracking-[0.22em] text-amber-900 font-bold">
+            Mubarak Ceramics Client Access
+          </span>
+          <h2 className="text-2xl font-serif font-bold text-stone-900">
+            {step === "phone" && "Login with Mobile"}
+            {step === "otp" && "Verify Mobile Number"}
+            {step === "name" && "Welcome to the Studio"}
+          </h2>
+          <p className="text-xs text-stone-500 max-w-xs mx-auto leading-relaxed">
+            {step === "phone" &&
+              "Enter your mobile number. We'll send an instant OTP to verify your account or sign you in."}
+            {step === "otp" &&
+              `Enter the 6-digit code sent to +91 ${cleanPhone}`}
+            {step === "name" &&
+              "Your account is verified! Tell us your name so we can personalize your studio orders."}
+          </p>
         </div>
 
-        {/* RIGHT COLUMN: MULTI-STEP AUTH FLOW */}
-        <div className="col-span-1 md:col-span-7 p-6 sm:p-9 overflow-y-auto max-h-[85vh] flex flex-col justify-center">
-          {/* STEP 1: PHONE NUMBER INPUT */}
-          {step === "phone" && (
-            <form onSubmit={handleSendOtp} className="space-y-5 animate-in fade-in duration-200">
-              <div className="space-y-1.5">
-                <span className="text-[10.5px] font-bold tracking-widest text-amber-800 uppercase font-mono block">
-                  CLIENT SIGN IN / SIGN UP
-                </span>
-                <h2 className="text-2xl sm:text-3xl font-serif font-bold text-stone-900">
-                  Enter your mobile number
-                </h2>
-                <p className="text-xs text-stone-600 leading-relaxed">
-                  We will send a 6-digit verification code to access your cart and place your order.
-                </p>
-              </div>
+        {/* Error Alert */}
+        {errorMessage && (
+          <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-700 text-center font-medium animate-in fade-in">
+            {errorMessage}
+          </div>
+        )}
 
-              {/* Phone Input */}
-              <div className="space-y-2">
-                <label className="text-[11px] font-bold text-stone-700 uppercase block">
-                  Mobile Number
-                </label>
-                <div className="flex items-center border border-stone-300 rounded-2xl bg-stone-50/60 focus-within:border-amber-800 focus-within:bg-white transition-all overflow-hidden p-1.5">
-                  <span className="px-3 text-xs font-bold text-stone-700 font-mono border-r border-stone-300">
-                    +91
-                  </span>
-                  <input
-                    type="tel"
-                    autoFocus
-                    placeholder="Enter 10 digit number"
-                    value={cleanPhone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-3 py-2 text-sm font-semibold tracking-wider text-stone-900 bg-transparent focus:outline-none"
-                    maxLength={10}
-                  />
-                </div>
-              </div>
+        {/* Dev OTP Pill (if available) */}
+        {devOtpHint && step === "otp" && (
+          <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-2 text-center text-xs text-amber-900 font-mono">
+            Demo Code: <span className="font-bold underline">{devOtpHint}</span>
+          </div>
+        )}
 
-              {/* WhatsApp Consent */}
-              <label className="flex items-start gap-2.5 cursor-pointer text-xs text-stone-600">
-                <input
-                  type="checkbox"
-                  checked={whatsappConsent}
-                  onChange={(e) => setWhatsappConsent(e.target.checked)}
-                  className="mt-0.5 rounded border-stone-300 text-amber-800 focus:ring-amber-700"
-                />
-                <span className="text-[11.5px] leading-snug">
-                  Get order confirmation &amp; dispatch tracking updates on WhatsApp.
-                </span>
+        {/* STEP 1: Phone Input */}
+        {step === "phone" && (
+          <form onSubmit={handleSendOtp} className="space-y-4">
+            <div>
+              <label className="block text-[11px] font-mono uppercase tracking-wider text-stone-600 mb-1.5 font-semibold">
+                Mobile Number
               </label>
-
-              {errorMessage && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
-                  {errorMessage}
+              <div className="relative flex items-center">
+                <div className="absolute left-3.5 flex items-center gap-1.5 text-stone-500 text-xs font-semibold select-none">
+                  <Phone className="h-4 w-4 text-amber-700" />
+                  <span>+91</span>
                 </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={!isPhoneValid || loading}
-                className="w-full py-3.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Sending OTP...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Continue</span>
-                    <ArrowRight className="h-4 w-4 text-amber-300" />
-                  </>
-                )}
-              </button>
-
-              <p className="text-[10.5px] text-center text-stone-400 leading-normal">
-                By continuing, you agree to Mubarak Tiles &amp; Ceramics Terms of Service &amp; Privacy Policy.
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  autoFocus
+                  placeholder="Enter 10-digit number"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  maxLength={10}
+                  className="w-full rounded-xl border border-stone-300 bg-white py-3 pl-20 pr-4 text-sm font-medium text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all shadow-xs"
+                />
+              </div>
+              <p className="text-[11px] text-stone-400 mt-1.5 pl-1">
+                New accounts are created automatically upon OTP verification.
               </p>
-            </form>
-          )}
+            </div>
 
-          {/* STEP 2: OTP VERIFICATION */}
-          {step === "otp" && (
-            <form onSubmit={handleVerifyOtp} className="space-y-5 animate-in fade-in duration-200">
-              <div className="space-y-1.5">
-                <span className="text-[10.5px] font-bold tracking-widest text-amber-800 uppercase font-mono block">
-                  SECURITY VERIFICATION
-                </span>
-                <h2 className="text-2xl sm:text-3xl font-serif font-bold text-stone-900">
-                  Enter OTP
-                </h2>
-                <div className="flex items-center gap-2 text-xs text-stone-600">
-                  <span>OTP sent to <strong>+91 {cleanPhone}</strong></span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStep("phone");
-                      setErrorMessage("");
-                    }}
-                    className="text-amber-800 font-bold underline hover:text-amber-950 cursor-pointer"
-                  >
-                    Edit
-                  </button>
-                </div>
+            <button
+              type="submit"
+              disabled={!isPhoneValid || loading}
+              className="w-full py-3.5 rounded-full bg-stone-950 hover:bg-stone-800 disabled:bg-stone-300 text-white font-bold text-xs uppercase tracking-[0.16em] transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed active:scale-98"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Sending OTP...</span>
+                </>
+              ) : (
+                <>
+                  <span>Send Verification Code</span>
+                  <ArrowRight className="h-4 w-4 text-amber-400" />
+                </>
+              )}
+            </button>
+          </form>
+        )}
+
+        {/* STEP 2: OTP Input */}
+        {step === "otp" && (
+          <form onSubmit={handleVerifyOtp} className="space-y-5">
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-[11px] font-mono uppercase tracking-wider text-stone-600 font-semibold">
+                  6-Digit OTP Code
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep("phone");
+                    setErrorMessage("");
+                  }}
+                  className="text-xs text-amber-900 hover:underline font-medium"
+                >
+                  Change phone
+                </button>
               </div>
 
-              {/* 6 OTP Input Boxes */}
-              <div className="flex items-center justify-between gap-2 sm:gap-3 py-2">
+              {/* 6 Digit Input Boxes */}
+              <div className="flex gap-2 sm:gap-2.5 justify-center">
                 {otpDigits.map((digit, idx) => (
                   <input
                     key={idx}
-                    ref={(el) => {
-                      otpInputsRef.current[idx] = el;
-                    }}
+                    ref={(el) => (otpInputsRef.current[idx] = el)}
                     type="text"
                     inputMode="numeric"
                     maxLength={1}
                     value={digit}
                     onChange={(e) => handleOtpChange(idx, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                    className="w-11 sm:w-12 h-13 text-center text-lg font-bold rounded-2xl border border-stone-300 bg-stone-50/60 focus:bg-white focus:border-amber-800 focus:outline-none transition-all shadow-xs text-stone-900"
+                    className="h-12 w-11 sm:h-13 sm:w-12 rounded-xl border border-stone-300 bg-white text-center font-mono text-lg font-bold text-stone-900 focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all shadow-xs"
                   />
                 ))}
               </div>
+            </div>
 
-              {/* Resend Timer / Action */}
-              <div className="flex items-center justify-between text-xs text-stone-500">
-                <span>Didn&apos;t receive code?</span>
-                {canResend ? (
-                  <button
-                    type="button"
-                    onClick={handleResendOtp}
-                    className="text-amber-800 font-bold hover:underline cursor-pointer"
-                  >
-                    Resend OTP
-                  </button>
-                ) : (
-                  <span className="text-stone-400 font-medium">
-                    Resend OTP in <strong>{timer}s</strong>
-                  </span>
-                )}
-              </div>
-
-              {errorMessage && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
-                  {errorMessage}
-                </div>
+            {/* Resend Timer */}
+            <div className="flex items-center justify-between text-xs text-stone-500 pt-1">
+              {canResend ? (
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  className="text-amber-900 hover:text-amber-800 font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  <span>Resend OTP</span>
+                </button>
+              ) : (
+                <span>Resend in {timer}s</span>
               )}
+              <span className="text-stone-400">Dev code: 123456</span>
+            </div>
 
+            <button
+              type="submit"
+              disabled={otpDigits.join("").length !== 6 || loading}
+              className="w-full py-3.5 rounded-full bg-stone-950 hover:bg-stone-800 disabled:bg-stone-300 text-white font-bold text-xs uppercase tracking-[0.16em] transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed active:scale-98"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Verifying...</span>
+                </>
+              ) : (
+                <>
+                  <span>Verify &amp; Continue</span>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                </>
+              )}
+            </button>
+          </form>
+        )}
+
+        {/* STEP 3: Optional Name Input for New Customers */}
+        {step === "name" && (
+          <form onSubmit={handleSaveName} className="space-y-4">
+            <div>
+              <label className="block text-[11px] font-mono uppercase tracking-wider text-stone-600 mb-1.5 font-semibold">
+                Your Full Name (Optional)
+              </label>
+              <div className="relative">
+                <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="e.g. Sumanth"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  className="w-full rounded-xl border border-stone-300 bg-white py-3 pl-10 pr-4 text-sm font-medium text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition-all shadow-xs"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2">
               <button
                 type="submit"
-                disabled={otpDigits.join("").length !== 6 || loading}
-                className="w-full py-3.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
+                className="w-full py-3.5 rounded-full bg-stone-950 hover:bg-stone-800 text-white font-bold text-xs uppercase tracking-[0.16em] transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-98"
               >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Verifying Code...</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck className="h-4 w-4 text-amber-300" />
-                    <span>Verify OTP &amp; Proceed</span>
-                  </>
-                )}
+                <span>Complete Setup</span>
+                <ArrowRight className="h-4 w-4 text-amber-400" />
               </button>
-            </form>
-          )}
-
-          {/* STEP 3: BASIC CUSTOMER DETAILS (For New Users) */}
-          {step === "details" && (
-            <form onSubmit={handleSaveDetails} className="space-y-5 animate-in fade-in duration-200">
-              <div className="space-y-1.5">
-                <span className="text-[10.5px] font-bold tracking-widest text-amber-800 uppercase font-mono block">
-                  CUSTOMER PROFILE
-                </span>
-                <h2 className="text-2xl sm:text-3xl font-serif font-bold text-stone-900">
-                  Your Details
-                </h2>
-                <p className="text-xs text-stone-600">
-                  Please provide your name for invoice and shipment documentation.
-                </p>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                <div>
-                  <label className="text-[11px] font-bold text-stone-700 uppercase block mb-1">
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    placeholder="e.g. Rajesh Kumar"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 bg-stone-50/60 focus:bg-white focus:border-amber-800 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-stone-700 uppercase block mb-1">
-                    Email Address (Optional)
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="rajesh@example.com"
-                    value={customerEmail}
-                    onChange={(e) => setCustomerEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 bg-stone-50/60 focus:bg-white focus:border-amber-800 focus:outline-none"
-                  />
-                </div>
-
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-800">
-                  <span>Phone: +91 {cleanPhone}</span>
-                  <span className="font-bold flex items-center gap-1">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Verified
-                  </span>
-                </div>
-              </div>
-
-              {errorMessage && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
-                  {errorMessage}
-                </div>
-              )}
-
               <button
-                type="submit"
-                disabled={!customerName.trim() || loading}
-                className="w-full py-3.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
+                type="button"
+                onClick={() => {
+                  onClose();
+                  if (onSuccess) onSuccess();
+                }}
+                className="w-full py-2 text-stone-500 hover:text-stone-800 text-xs font-semibold transition-colors"
               >
-                <span>Continue to Address</span>
-                <ArrowRight className="h-4 w-4 text-amber-300" />
+                Skip for now
               </button>
-            </form>
-          )}
+            </div>
+          </form>
+        )}
 
-          {/* STEP 4: DELIVERY ADDRESS FORM */}
-          {step === "address" && (
-            <form onSubmit={handleSaveAddress} className="space-y-4 animate-in fade-in duration-200">
-              <div className="space-y-1">
-                <span className="text-[10.5px] font-bold tracking-widest text-amber-800 uppercase font-mono block">
-                  DELIVERY DESTINATION
-                </span>
-                <h2 className="text-xl sm:text-2xl font-serif font-bold text-stone-900">
-                  Delivery Address
-                </h2>
-              </div>
-
-              <div className="space-y-2.5 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="text-[10.5px] font-bold text-stone-700 uppercase block mb-1">
-                      Full Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-stone-300 bg-stone-50/60 focus:bg-white focus:border-amber-800 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10.5px] font-bold text-stone-700 uppercase block mb-1">
-                      Phone Number *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={addressPhone}
-                      onChange={(e) => setAddressPhone(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-stone-300 bg-stone-50/60 focus:bg-white focus:border-amber-800 focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10.5px] font-bold text-stone-700 uppercase block mb-1">
-                    House / Building / Street Address *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Plot #42, Green Glen Layout, 1st Cross"
-                    value={addressLine}
-                    onChange={(e) => setAddressLine(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 bg-stone-50/60 focus:bg-white focus:border-amber-800 focus:outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="text-[10.5px] font-bold text-stone-700 uppercase block mb-1">
-                      Area / Locality
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Bellandur"
-                      value={area}
-                      onChange={(e) => setArea(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-stone-300 bg-stone-50/60 focus:bg-white focus:border-amber-800 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10.5px] font-bold text-stone-700 uppercase block mb-1">
-                      Landmark (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Near Central Mall"
-                      value={landmark}
-                      onChange={(e) => setLandmark(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-stone-300 bg-stone-50/60 focus:bg-white focus:border-amber-800 focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-stone-700 uppercase block mb-1">
-                      City *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-stone-700 uppercase block mb-1">
-                      State *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={state}
-                      onChange={(e) => setState(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-stone-700 uppercase block mb-1">
-                      Pincode * (6-digits)
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      maxLength={6}
-                      value={pincode}
-                      onChange={(e) => setPincode(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 text-xs font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {errorMessage && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
-                  {errorMessage}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Saving Address...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Save Address &amp; Continue to Checkout</span>
-                    <ArrowRight className="h-4 w-4 text-amber-300" />
-                  </>
-                )}
-              </button>
-            </form>
-          )}
+        {/* Trust Footer */}
+        <div className="mt-6 pt-4 border-t border-stone-200/80 flex items-center justify-center gap-2 text-[11px] text-stone-500">
+          <ShieldCheck className="h-4 w-4 text-emerald-600" />
+          <span>Secure authentication · No password needed</span>
         </div>
       </div>
     </div>
   );
+
+  if (typeof document !== "undefined") {
+    return createPortal(modalContent, document.body);
+  }
+
+  return modalContent;
 }
 
 export default LoginSignupModal;

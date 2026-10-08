@@ -116,12 +116,17 @@ function Index() {
       return <ShopByCategorySection key={sec.id} content={content} />;
     }
     if (
+      key === "quick_sinks" ||
+      key === "sinks" ||
       key === "featured_tiles" ||
       key === "featured_products" ||
       key === "best_sellers" ||
       key === "bestsellers" ||
+      key === "signature_pieces" ||
+      type === "sinks_grid" ||
       type === "featured_grid" ||
-      type === "bestsellers_grid"
+      type === "bestsellers_grid" ||
+      type === "signature_grid"
     ) {
       return <FeaturedTilesSection key={sec.id} content={content} />;
     }
